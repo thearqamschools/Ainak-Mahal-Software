@@ -4,6 +4,7 @@ from tkinter import ttk,messagebox,filedialog,simpledialog
 from pathlib import Path
 from core import Store
 import phase3
+import phase6
 import webbrowser
 from deployment_tools import verified_backup, reconcile_stock, reconcile_payments, export_invoice
 # Authentication is established in-process by launcher.py.
