@@ -12,10 +12,14 @@ def verified_backup(store, directory):
     stamp=datetime.now().strftime('%Y%m%d_%H%M%S_%f')
     dest=directory/f'ainak_mahal_{stamp}.sqlite3'
     store.backup(dest)
-    with sqlite3.connect(dest) as conn:
-        if conn.execute('PRAGMA integrity_check').fetchone()[0]!='ok':
-            dest.unlink(missing_ok=True)
-            raise RuntimeError('Backup integrity check failed')
+    conn = sqlite3.connect(dest)
+    try:
+        valid = conn.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
+    finally:
+        conn.close()  # A context manager commits but does not close SQLite connections.
+    if not valid:
+        dest.unlink(missing_ok=True)
+        raise RuntimeError('Backup integrity check failed')
     return dest
 
 
