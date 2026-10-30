@@ -345,7 +345,7 @@ class Desktop:
         self.button(self.toolbar(),'Receive selected PO',receive)
     def payments(self):
         bar=self.toolbar()
-        grid=Grid(self.body,('Invoice','Customer','Date','Total PKR','Paid PKR','Balance PKR'),self.s.sales())
+        grid=Grid(self.body,('Invoice','Customer','Date','Total PKR','Paid PKR','Balance PKR'),self.s.sales(),height=5)
         def collect():
             row=grid.selected();Dialog(self,'Receive payment',[('amount','Amount received PKR *'),('method','Method',('Cash','Bank','Card'))],lambda v:self.s.pay(row[0],v['amount'],v['method']),f'Invoice #{row[0]} · Balance PKR {row[5]:,.2f}')
         self.button(bar,'Receive payment',collect,True);self.button(bar,'Print invoice',lambda:self.print_doc('Invoice',grid.selected()[0]))
@@ -364,7 +364,7 @@ class Desktop:
         ttk.Label(self.body,text='Refund settlements',font=('Segoe UI',14,'bold')).pack(anchor='w',pady=(12,0))
         refunds=Grid(self.body,('Return','Invoice','Method','Payout due PKR','Paid PKR'),self.s.rows('''SELECT r.id,r.sale_id,s.method,s.cash_refund_cents/100.0,
           COALESCE((SELECT SUM(amount_cents)/100.0 FROM refund_payouts WHERE return_id=r.id),0)
-          FROM sale_returns r JOIN return_settlements s ON s.return_id=r.id ORDER BY r.id DESC'''),height=4)
+          FROM sale_returns r JOIN return_settlements s ON s.return_id=r.id ORDER BY r.id DESC'''),height=3)
         def payout():
             row=refunds.selected()
             def save(v):

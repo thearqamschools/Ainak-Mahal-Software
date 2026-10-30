@@ -30,8 +30,16 @@ def run():
             errors=[];root.report_callback_exception=lambda *args:errors.append(str(args))
             ui=Desktop(root,s)
             ui.safe=lambda action:action()
+            root.geometry('1050x700');root.update()
+            def buttons(widget):
+                for child in widget.winfo_children():
+                    if child.winfo_class() in ('TButton','Button'):yield child
+                    yield from buttons(child)
             for page in Desktop.PAGES:
                 ui.show(page);root.update()
+                for button in buttons(root):
+                    if not button.winfo_ismapped() or button.winfo_rooty()+button.winfo_height()>root.winfo_rooty()+root.winfo_height():
+                        raise AssertionError(f'Action clipped at minimum window size: {page}: {button.cget("text")}')
             if errors:raise RuntimeError('; '.join(errors))
             for kind,ref in (('Invoice',sid),('Prescription',rx),('Job',job)):
                 assert s.print_document(kind,ref,temp).exists()
