@@ -4,6 +4,35 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
+class AtomicConnection(sqlite3.Connection):
+    """Nested service calls use savepoints, never commit their caller's work."""
+    def __enter__(self):
+        depth = getattr(self, '_depth', 0)
+        self.execute('BEGIN IMMEDIATE' if depth == 0 and not self.in_transaction else f'SAVEPOINT service_{depth}')
+        self._depth = depth + 1
+        return self
+
+    def __exit__(self, kind, value, traceback):
+        self._depth -= 1
+        if self._depth:
+            if kind:
+                self.execute(f'ROLLBACK TO service_{self._depth}')
+            self.execute(f'RELEASE service_{self._depth}')
+        elif kind:
+            self.rollback()
+        else:
+            self.commit()
+        return False
+
+def quantity(value):
+    try:
+        n = Decimal(str(value))
+        if not n.is_finite() or n != n.to_integral_value() or n <= 0:
+            raise ValueError('Quantity must be a positive whole number')
+        return int(n)
+    except InvalidOperation:
+        raise ValueError('Quantity must be a positive whole number') from None
+
 SCHEMA = '''
 CREATE TABLE IF NOT EXISTS branches(id TEXT PRIMARY KEY,name TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS customers(id INTEGER PRIMARY KEY,name TEXT NOT NULL,phone TEXT,address TEXT,branch_id TEXT DEFAULT 'MAIN');
@@ -32,7 +61,7 @@ def now(): return datetime.now().isoformat(timespec='seconds')
 
 class Store:
     def __init__(self,path):
-        self.path=str(path); self.db=sqlite3.connect(self.path)
+        self.path=str(path); self.db=sqlite3.connect(self.path, factory=AtomicConnection)
         self.db.execute('PRAGMA foreign_keys=ON');self.db.execute('PRAGMA busy_timeout=5000')
         self.db.executescript(SCHEMA)
         self.db.execute("INSERT OR IGNORE INTO branches(id,name) VALUES('MAIN','Ainak Mahal - Millat Chowk')")
@@ -56,7 +85,7 @@ class Store:
         if not items:raise ValueError('Cart is empty')
         grouped={}
         for pid,qty in items:
-            pid=int(pid);qty=int(qty)
+            pid=int(pid);qty=quantity(qty)
             if qty<=0:raise ValueError('Quantity must be positive')
             grouped[pid]=grouped.get(pid,0)+qty
         paid_cents=money(paid)
@@ -84,7 +113,7 @@ class Store:
             row=self.db.execute('SELECT total,paid FROM sales WHERE id=?',(sale_id,)).fetchone()
             if not row:raise ValueError('Invoice not found')
             if cents>money(row[0])-money(row[1]):raise ValueError('Payment exceeds balance')
-            self.db.execute('UPDATE sales SET paid=paid+? WHERE id=?',(cents/100,sale_id))
+            self.db.execute('UPDATE sales SET paid=ROUND(paid+?,2) WHERE id=?',(cents/100,sale_id))
             self.db.execute('INSERT INTO customer_payments VALUES(?,?,?,?,?)',(str(uuid.uuid4()),sale_id,cents/100,method,now()))
             self.db.execute('INSERT INTO sync_outbox VALUES(?,?,?,?,?,NULL)',(str(uuid.uuid4()),'sale',str(sale_id),'payment',now()))
     def receive(self,supplier_id,items):
@@ -93,7 +122,7 @@ class Store:
             if not self.db.execute('SELECT 1 FROM suppliers WHERE id=?',(supplier_id,)).fetchone():raise ValueError('Supplier not found')
             total=0;lines=[]
             for pid,qty,cost in items:
-                qty=int(qty); cents=money(cost)
+                qty=quantity(qty); cents=money(cost)
                 if qty<=0:raise ValueError('Quantity must be positive')
                 if not self.db.execute('SELECT 1 FROM products WHERE id=?',(pid,)).fetchone():raise ValueError('Product not found')
                 lines.append((pid,qty,cents));total+=qty*cents

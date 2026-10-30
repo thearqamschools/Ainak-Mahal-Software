@@ -28,7 +28,16 @@ def return_item(store,sale_id,product_id,qty,reason,actor,role,restock=True):
         sold,price=row
         returned=store.db.execute('SELECT COALESCE(SUM(qty),0) FROM sale_returns WHERE sale_id=? AND product_id=?',(sale_id,product_id)).fetchone()[0]
         if not sold or qty>sold-returned:raise ValueError('Return exceeds unreturned sold quantity')
-        refund_cents=money(price)*qty
+        # New invoices can contain cent allocations after discount/tax. Refund
+        # the exact unreturned units in insertion order, rather than MAX(price).
+        remaining = returned
+        refund_cents = 0
+        needed = qty
+        for line_qty, line_price in store.db.execute('SELECT qty,price FROM sale_items WHERE sale_id=? AND product_id=? ORDER BY id',(sale_id,product_id)):
+            skip = min(remaining,line_qty); remaining -= skip
+            take = min(needed,line_qty-skip)
+            refund_cents += money(line_price)*take; needed -= take
+            if not needed: break
         rid=store.db.execute('INSERT INTO sale_returns(sale_id,product_id,qty,refund,reason,actor,created_at) VALUES(?,?,?,?,?,?,?)',(sale_id,product_id,qty,refund_cents/100,reason.strip(),actor,now())).lastrowid
         if restock:
             store.db.execute('UPDATE products SET qty=qty+? WHERE id=?',(qty,product_id))
@@ -58,6 +67,7 @@ def verify_database(path):
         required={'customers','products','sales','sale_items'}
         found={r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         if not required<=found:raise ValueError('Not an Ainak Mahal database')
+        if con.execute('PRAGMA foreign_key_check').fetchone():raise ValueError('Database contains broken references')
     finally:con.close()
 
 def restore_database(backup_path,live_path):
@@ -67,7 +77,7 @@ def restore_database(backup_path,live_path):
     verify_database(backup_path)
     if live_path.exists():
         verify_database(live_path)
-        safety=live_path.with_name(live_path.stem+'_before_restore_'+datetime.now().strftime('%Y%m%d_%H%M%S')+live_path.suffix)
+        safety=live_path.with_name(live_path.stem+'_before_restore_'+datetime.now().strftime('%Y%m%d_%H%M%S_%f')+live_path.suffix)
         shutil.copy2(live_path,safety)
     else:safety=None
     fd,tmp=tempfile.mkstemp(prefix='.ainak_restore_',dir=live_path.parent);os.close(fd)
