@@ -1,5 +1,5 @@
 #define MyAppName "Ainak Mahal"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "2.0.0"
 #define MyAppExeName "AinakMahal.exe"
 [Setup]
 AppId={{F5BDB79A-A4E8-44EF-90CB-9160F5D0E4A2}
@@ -16,6 +16,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 WizardStyle=modern
+SetupIconFile=..\assets\brand\ainak-mahal.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Uninstallable=not IsSmokeTest
 CreateUninstallRegKey=not IsSmokeTest

@@ -17,7 +17,12 @@ try {
     $env:AINAK_SMOKE_RESULT=Join-Path $testRoot 'smoke.json'
     $exe = Join-Path $installDir 'AinakMahal.exe'
     $p=Start-Process $exe -ArgumentList '--smoke-test' -PassThru -WindowStyle Hidden
-    if (!$p.WaitForExit(120000)) { $p.Kill(); throw 'Installed smoke check timed out' }
+    if (!$p.WaitForExit(120000)) {
+        $p.Kill()
+        $stagePath=$env:AINAK_SMOKE_RESULT+'.progress.log'
+        $stage=if(Test-Path $stagePath){Get-Content -Raw $stagePath}else{'before smoke runner startup'}
+        throw "Installed smoke check timed out at: $stage"
+    }
     if ($p.ExitCode -or !(Test-Path $env:AINAK_SMOKE_RESULT)) { throw 'Installed executable smoke check failed' }
     $result=Get-Content -Raw $env:AINAK_SMOKE_RESULT | ConvertFrom-Json
     if (!$result.passed) { throw ($result | ConvertTo-Json -Depth 8) }

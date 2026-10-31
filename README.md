@@ -1,32 +1,34 @@
-# Ainak Mahal · Offline Windows optical store
+# Ainak Mahal Desktop ERP 2.0
 
-A native Windows desktop application for Ainak Mahal, Millat Chowk, Faisalabad.
-Implemented against [Issue #1](https://github.com/thearqamschools/Ainak-Mahal-Software/issues/1).
-No runtime internet connection, Python installation, hosting or subscription is required
-when installed using `AinakMahal_Setup.exe`.
+Original branding and a native Qt Widgets interface for an offline optical shop in
+Millat Chowk, Faisalabad. No web application, cloud account, subscription or hosting.
+The Windows installer includes the runtime; users do not need Python or internet.
 
-## Start
+## Run or install
 
-Install `output/AinakMahal_Setup.exe`, open Ainak Mahal, and create the first administrator.
-There is no default password. For development, install CPython 3.14 x64 including Tcl/Tk
-and run `python launcher.py`. Keep `app.py` and `legacy_launcher.py` for legacy support;
-`app.py` intentionally refuses a direct launch without its authenticated session.
+Install `AinakMahal_Setup.exe` and open Ainak Mahal from Start. Create a first administrator;
+there is no default password. For source development use CPython 3.14 x64, install
+`requirements-build.txt`, then `python launcher.py` (or `python qt_launcher.py`).
+`python launcher.py --legacy` retains the earlier Tkinter UI for diagnostic/regression use.
+Do not use old UI builds for trading against the new supplier ledger.
 
-Customer, prescription, inventory, barcode checkout, partial payment, returns/refund payouts,
-store-credit redemption, lab jobs, supplier/PO receipt, cash/expenses, closing, reports,
-printing, staff administration and verified backup/recovery are available through the sidebar.
-F2 opens checkout; F3 opens customers; Ctrl+Enter saves a sale.
+Data remains `%USERPROFILE%\AinakMahal\ainak_mahal.db`, outside installation files.
+Schema 2 preserves legacy tables, rows and identifiers and takes a pre-upgrade snapshot.
+No production database is shipped in the repository or installer. Use AINAK_DATA_DIR only
+for isolated manual tests. A local instance lock protects application/recovery exclusivity.
 
-## Data and upgrade
+## Workflows
 
-Data stays at `%USERPROFILE%\AinakMahal\ainak_mahal.db`. Installation and uninstallation
-never delete it. Additive schema version 1 preserves legacy integer IDs, rows and tables;
-a pre-migration backup is made automatically. UUID identities, timestamps, branch MAIN and
-change journals prepare a future sync boundary, with no network dependency now.
+The sidebar covers live dashboard, integrated customer/Rx/cart/payment/optical-job checkout,
+customer profiles/history, printable prescriptions, frame/lens/contact-lens inventory,
+Code 128 labels, optical jobs/repairs with charges, supplier PO/receipt/payment ledger,
+customer dues/returns/store credit, cash/expenses/closing, reports/PDF/CSV, staff/audit and
+verified backup/recovery. F2 checkout, F3 customers, Ctrl+K search, Ctrl+Enter save order.
+Original navy/teal eyeglasses identity is included as SVG, PNG and multi-size ICO.
 
-## Build and test
+## Build and verify on Windows
 
-On Windows, with CPython 3.14 x64 (Tcl/Tk included) and Inno Setup 6 installed:
+Install CPython 3.14 x64 with Tcl/Tk (retained for recovery) and Inno Setup 6:
 
 ```powershell
 python -m venv .venv
@@ -34,36 +36,38 @@ python -m venv .venv
 ./tools/installer-smoke.ps1
 ```
 
-The build runs all unit/integration tests and source GUI smoke checks, installs pinned
-packaging dependencies, freezes the app and compiles the installer. CI repeats this on
-Windows and uploads the installer, checksum and smoke evidence as an Actions artifact.
-The installer smoke mode uses a temporary directory and does not register Start-menu or
-uninstall entries. It verifies the installed executable with external Tcl variables cleared,
-then reinstalls and checks the fixture database hash is unchanged. It is not a substitute
-for physical printer/scanner tests or a fresh Windows 11 machine.
+The script installs exact runtime/build pins, runs all unit/integration/Qt tests, runs the
+sample GUI smoke workflow, freezes a dynamic onedir application, collects license notices,
+and compiles `output/AinakMahal_Setup.exe`. CI repeats build/install/upgrade checks on Windows
+and uploads installer, checksum and smoke evidence. Installed smoke clears external Tcl
+variables, runs embedded-runtime workflows and checks the populated database hash through
+reinstallation. It is not a physical printer/scanner or pristine Windows 11 certification.
 
 ```powershell
 python -m unittest discover -v
-python launcher.py --smoke-test
-python tools/preview.py
+python qt_launcher.py --smoke-test
 ```
 
-Smoke tests use temporary databases. `AINAK_DATA_DIR` can isolate a manual test instance;
-leave it unset for normal operation. Never put sample transactions in live customer data.
+Set AINAK_SCREENSHOTS to a test output folder to capture real rendered Qt screens during
+smoke. All sample data is disposable. Never run manual sample sales against the live shop.
+Brand generation alone uses development tools Pillow 12.0.0 and resvg-py 0.5.0; reference
+video decoding used imageio-ffmpeg 0.6.0. None is a runtime dependency.
 
-## Documentation
+## Review documentation
 
-- [Operator guide](docs/OPERATOR_GUIDE.md) and [offline printable guide](docs/OPERATOR_GUIDE.html)
-- [Audit, implementation decisions and UX specification](docs/BUILD_PLAN.md)
-- [Release verification and remaining checks](docs/RELEASE_REVIEW.md)
-- [Marketing copy](docs/MARKETING.md)
+- [Operator guide](docs/OPERATOR_GUIDE.md) / [offline printable HTML](docs/OPERATOR_GUIDE.html)
+- [Reference evidence and gap analysis](docs/ERP2_REFERENCE_REVIEW.md)
+- [Original logo and complete design system](docs/DESIGN_SYSTEM_2.md)
+- [Feature checklist and verification](docs/ERP2_RELEASE_REVIEW.md)
+- [Dependency licenses and replacement/source instructions](docs/THIRD_PARTY_ERP2.md)
+- [Original foundation audit](docs/BUILD_PLAN.md)
 
-## Product boundaries
+## Deliberate boundaries
 
-Single Windows workstation; future synchronization is not enabled. POs support full
-receipt once; use direct receipts for partial shipments. Printing uses the local browser
-and printer dialog. Profit estimates disclose unrecoverable legacy cost history. Cash
-closings are immutable snapshots; complete all trading activity first. Store-credit
-redemption is available between invoices for the same named customer. The installer is
-unsigned; a signing certificate has not been provided. Review the verification report
-and complete the hardware/clean-machine checklist before shop rollout.
+Single workstation/branch MAIN; no cloud sync, Google login, mobile app, subscription or
+remote messaging. POs receive in full once; use direct receipts for partial shipments.
+Legacy supplier receipts are unverified until an administrator confirms their opening
+balance. Closing is an immutable daily count snapshot rather than a shift lock. Legacy
+profit costs without historical snapshots remain estimates. Printing uses Qt's local
+Windows/PDF engine. Installer is unsigned without a supplied trusted signing certificate.
+Complete hardware, accessibility and shop-operator acceptance before daily trading.

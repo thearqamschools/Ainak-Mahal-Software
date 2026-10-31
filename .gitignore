@@ -8,3 +8,5 @@ dist/
 output/
 *.spec
 test-results/
+debug-dist/
+test-artifacts/
