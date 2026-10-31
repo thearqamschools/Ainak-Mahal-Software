@@ -74,6 +74,8 @@ def run(app):
     finally:
         if window:window.cart=[];window.close()
     output=os.environ.get('AINAK_SMOKE_RESULT')
+    from app_info import VERSION,BUILD_ID,DEVELOPER
+    result.update(version=VERSION,build_id=BUILD_ID,developer=DEVELOPER)
     if output:Path(output).write_text(json.dumps(result,indent=2),encoding='utf-8')
     else:print(json.dumps(result,indent=2))
     return 0 if result['passed'] else 1

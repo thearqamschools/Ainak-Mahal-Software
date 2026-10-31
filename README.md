@@ -71,3 +71,8 @@ balance. Closing is an immutable daily count snapshot rather than a shift lock. 
 profit costs without historical snapshots remain estimates. Printing uses Qt's local
 Windows/PDF engine. Installer is unsigned without a supplied trusted signing certificate.
 Complete hardware, accessibility and shop-operator acceptance before daily trading.
+
+
+Developed by **Ahsan Iftikhar**. Current release: **2.0.1**.
+
+Every build generates a unique UTC build ID and matching Windows FileVersion/ProductVersion for the app and installer. See `output/release-metadata.json`; the login, app footer and About screen display the release/build identity. `app_info.py` is the release-version source of truth.

@@ -17,3 +17,6 @@ balances with Ainak Mahal's offline Windows desktop software. Local data. No sub
 
 This text is for a future marketing page; the desktop runtime includes no SEO scripts,
 analytics, tracking or external assets.
+
+
+Developed by **Ahsan Iftikhar**. Current release: **2.0.1**.

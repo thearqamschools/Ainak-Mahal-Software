@@ -4,9 +4,10 @@ from PySide6.QtWidgets import QApplication,QMessageBox
 from paths import data_dir,InstanceLock
 from erp import ERP
 from qdesktop import Window,Login,STYLE
+from app_info import VERSION
 
 def main():
-    app=QApplication.instance() or QApplication(sys.argv);app.setStyle('Fusion');app.setStyleSheet(STYLE);app.setApplicationName('Ainak Mahal')
+    app=QApplication.instance() or QApplication(sys.argv);app.setStyle('Fusion');app.setStyleSheet(STYLE);app.setApplicationName('Ainak Mahal');app.setApplicationVersion(VERSION)
     if '--smoke-test' in sys.argv:
         from qt_smoke import run
         return run(app)

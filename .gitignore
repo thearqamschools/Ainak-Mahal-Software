@@ -10,3 +10,4 @@ output/
 test-results/
 debug-dist/
 test-artifacts/
+_build_info.py

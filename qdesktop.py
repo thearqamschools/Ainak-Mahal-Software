@@ -8,6 +8,7 @@ from PySide6.QtWidgets import *
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtPrintSupport import QPrinter,QPrintDialog
 from paths import data_dir
+from app_info import VERSION,DISPLAY_VERSION,DEVELOPER_CREDIT
 
 ASSETS=Path(__file__).resolve().parent/'assets'/'brand'
 NAV=('Dashboard','New Sale / POS','Customers','Prescriptions','Inventory','Optical Jobs & Repairs','Purchases & Suppliers','Payments & Returns','Expenses & Accounts','Reports','Settings & Staff','Backup & Recovery')
@@ -139,7 +140,7 @@ class Trend(QWidget):
 class Window(QMainWindow):
     def __init__(self,s):
         super().__init__();self.s=s;self.cart=[];self.current=0;self.report_data=None;self.resize(1440,920);self.setMinimumSize(1080,720)
-        self.setWindowTitle('Ainak Mahal · Desktop ERP 2.0');self.setWindowIcon(QIcon(str(ASSETS/'ainak-mahal.ico')))
+        self.setWindowTitle(f'Ainak Mahal · Desktop ERP {VERSION}');self.setWindowIcon(QIcon(str(ASSETS/'ainak-mahal.ico')))
         shell=QWidget();self.setCentralWidget(shell);layout=QHBoxLayout(shell);layout.setContentsMargins(0,0,0,0);layout.setSpacing(0)
         sidebar=QFrame();sidebar.setObjectName('sidebar');sidebar.setFixedWidth(220);nav=vbox(sidebar,16,5);brand=QSvgWidget(str(ASSETS/'logo-dark.svg'));brand.setFixedSize(184,55);nav.addWidget(brand);nav.addWidget(label('OPTICAL STORE / FAISALABAD'));nav.addSpacing(18);self.nav=[]
         for i,name in enumerate(NAV):
@@ -149,7 +150,8 @@ class Window(QMainWindow):
         nav.addStretch();nav.addWidget(label('●  OFFLINE · LOCAL DATA'));nav.addWidget(label(f'{s.actor} / {s.role}'));layout.addWidget(sidebar)
         right=QWidget();right.setObjectName('canvas');content=vbox(right,24,14);layout.addWidget(right,1);top=QHBoxLayout();top.addWidget(label('AINAK MAHAL / WORKSPACE','eyebrow'));top.addStretch()
         self.search=QLineEdit();self.search.setPlaceholderText('Search workspace…  Ctrl+K');self.search.setMinimumWidth(260);self.search.returnPressed.connect(lambda:self.safe(self.global_search));top.addWidget(self.search);top.addWidget(action('Refresh',lambda:self.safe(self.refresh)));top.addWidget(label('Offline','badge'));content.addLayout(top)
-        self.title=label('','heading');content.addWidget(self.title);self.subtitle=label('','muted');content.addWidget(self.subtitle);self.area=QScrollArea();self.area.setWidgetResizable(True);content.addWidget(self.area,1);self.notice=label('All changes are saved on this computer.','muted');content.addWidget(self.notice)
+        self.title=label('','heading');content.addWidget(self.title);self.subtitle=label('','muted');content.addWidget(self.subtitle);self.area=QScrollArea();self.area.setWidgetResizable(True);content.addWidget(self.area,1);self.notice=label('All changes are saved on this computer.','muted')
+        footer=QHBoxLayout();footer.addWidget(self.notice,1);version=label(DISPLAY_VERSION,'muted');version.setStyleSheet('font-size:8pt;color:#526277');footer.addWidget(version,0,Qt.AlignRight);content.addLayout(footer)
         QShortcut(QKeySequence('F2'),self,activated=lambda:self.show_page(1));QShortcut(QKeySequence('F3'),self,activated=lambda:self.show_page(2));QShortcut(QKeySequence('Ctrl+K'),self,activated=self.search.setFocus);QShortcut(QKeySequence('Ctrl+Return'),self,activated=lambda:self.safe(self.complete) if self.current==1 else None);self.show_page(0)
     def safe(self,f):
         try:return f()
@@ -386,7 +388,7 @@ class Window(QMainWindow):
             self.form('Shop settings',fields,self.s.save_settings)
         self.button(bar,'Edit shop settings',shop,True);self.button(bar,'Add staff account',lambda:self.form('Staff account',[('username','Username *'),('password','Password (10+ characters) *','password'),('role','Role',('cashier','admin'))],lambda v:self.s.create_user(v['username'],v['password'],v['role'])));self.button(bar,'About & offline data',self.about)
         t=self.table(('ID','Username','Role','Active'),self.s.users());self.button(self.bar(),'Enable / disable selected',lambda:(self.s.set_active(t.selected()[1],not t.selected()[3]),self.refresh()));self.body.addWidget(label('Audit trail · latest 200 events','section'));self.table(('Staff','Action','Reference','Date'),self.s.rows('SELECT actor,action,reference,created_at FROM audit_events ORDER BY id DESC LIMIT 200'))
-    def about(self):self.document('About Ainak Mahal','<h1>Ainak Mahal Desktop ERP 2.0</h1><p>Millat Chowk, Faisalabad · Offline optical store management.</p><p>Data stays in your Windows profile. No subscription, telemetry or cloud account. Keep verified backups on another drive.</p><p>Original artwork and Qt Widgets UI. Qt/PySide6 are dynamically distributed under their applicable open-source licenses. See bundled license notices, source and replacement instructions.</p>')
+    def about(self):self.document('About Ainak Mahal',f'<h1>Ainak Mahal Desktop ERP {VERSION}</h1><p><b>{DEVELOPER_CREDIT}</b></p><p>{DISPLAY_VERSION}</p><p>Millat Chowk, Faisalabad · Offline optical store management.</p><p>Data stays in your Windows profile. No subscription, telemetry or cloud account. Keep verified backups on another drive.</p><p>Original artwork and Qt Widgets UI. Qt/PySide6 are dynamically distributed under their applicable open-source licenses. See bundled license notices, source and replacement instructions.</p>')
     def backup(self):
         self.s.authorize(True);w,l=card('Keep a verified copy, every day');l.addWidget(label(str(data_dir()/'ainak_mahal.db'),'muted'));l.addWidget(label('Backups contain customer details and password hashes. Keep a protected copy on another drive.'));row=QHBoxLayout();l.addLayout(row)
         def backup():
@@ -429,7 +431,7 @@ class Window(QMainWindow):
 class Login(QWidget):
     def __init__(self,s,on_login):
         super().__init__();self.s=s;self.on_login=on_login;self.setWindowTitle('Ainak Mahal · Sign in');self.resize(1040,700);self.setMinimumSize(850,640);self.setWindowIcon(QIcon(str(ASSETS/'ainak-mahal.ico')));outer=QHBoxLayout(self);outer.setContentsMargins(0,0,0,0);outer.setSpacing(0)
-        hero=QFrame();hero.setObjectName('sidebar');left=vbox(hero,44,20);logo=QSvgWidget(str(ASSETS/'logo-dark.svg'));logo.setFixedSize(350,90);left.addWidget(logo);left.addStretch();h=label('A clearer view\nof your shop.');h.setStyleSheet('font-size:30pt;color:white;font-weight:600');left.addWidget(h);left.addWidget(label('Customers, prescriptions and eyewear.\nEvery order, from counter to collection.'));left.addSpacing(24);left.addWidget(label('01   Connected optical orders\n\n02   Accurate stock and balances\n\n03   Your data, safely offline'));left.addStretch();left.addWidget(label('MILLAT CHOWK · FAISALABAD'));outer.addWidget(hero,1)
+        hero=QFrame();hero.setObjectName('sidebar');left=vbox(hero,44,20);logo=QSvgWidget(str(ASSETS/'logo-dark.svg'));logo.setFixedSize(350,90);left.addWidget(logo);left.addStretch();h=label('A clearer view\nof your shop.');h.setStyleSheet('font-size:30pt;color:white;font-weight:600');left.addWidget(h);left.addWidget(label('Customers, prescriptions and eyewear.\nEvery order, from counter to collection.'));left.addSpacing(24);left.addWidget(label('01   Connected optical orders\n\n02   Accurate stock and balances\n\n03   Your data, safely offline'));left.addStretch();footer=QWidget();footer_layout=vbox(footer,0,4);footer_layout.addWidget(label('MILLAT CHOWK · FAISALABAD'));credit=label(DEVELOPER_CREDIT);credit.setObjectName('developerCredit');credit.setStyleSheet('font-size:9pt;color:#C9D8E7');footer_layout.addWidget(credit);build=label(DISPLAY_VERSION);build.setStyleSheet('font-size:8pt;color:#AFC4DA');footer_layout.addWidget(build);left.addWidget(footer);outer.addWidget(hero,1)
         right=QWidget();right.setObjectName('canvas');rl=vbox(right,48,16);rl.addStretch();first=s.first_run();rl.addWidget(label('YOUR LOCAL WORKSPACE','eyebrow'));rl.addWidget(label('Set up your shop' if first else 'Welcome back','heading'));rl.addWidget(label('Create your administrator account. No internet or subscription required.' if first else 'Sign in to continue. Your data stays on this computer.','muted'));self.fields={}
         for key,title in [('username','Username'),('password','Password')]+([('confirm','Confirm password')] if first else []):
             rl.addWidget(label(title));entry=QLineEdit();entry.setAccessibleName(title)

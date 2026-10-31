@@ -33,6 +33,7 @@ jobs:
           path: |
             output/AinakMahal_Setup.exe
             output/SHA256.txt
+            output/release-metadata.json
             test-results/installed-smoke.json
           if-no-files-found: error
           retention-days: 30

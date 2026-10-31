@@ -193,3 +193,6 @@ Check real printer/scanner, Windows scaling and screen-reader use. `AinakMahal.e
 
 The installer is unsigned unless a trusted signing certificate is provided. The tested
 build is for review; complete real-device and operator acceptance before daily trading.
+
+
+Developed by **Ahsan Iftikhar**. Current release: **2.0.1**.
