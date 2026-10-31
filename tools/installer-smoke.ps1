@@ -21,7 +21,7 @@ try {
     $expected=Get-Content -Raw -LiteralPath $metadataPath | ConvertFrom-Json
     $installedVersion=(Get-Item -LiteralPath $exe).VersionInfo
     if ($installedVersion.FileVersion -ne $expected.file_version -or $installedVersion.CompanyName -ne $expected.developer -or !$installedVersion.ProductVersion.StartsWith($expected.version)) { throw 'Installed EXE version/developer metadata does not match the build manifest' }
-    if ((Get-Item -LiteralPath $installerPath).VersionInfo.FileVersion -ne $expected.file_version) { throw 'Installer version differs from executable version' }
+    if ((Get-Item -LiteralPath $installerPath).VersionInfo.FileVersion.Trim() -ne $expected.file_version) { throw 'Installer version differs from executable version' }
     $p=Start-Process $exe -ArgumentList '--smoke-test' -PassThru -WindowStyle Hidden
     if (!$p.WaitForExit(120000)) {
         $p.Kill()
