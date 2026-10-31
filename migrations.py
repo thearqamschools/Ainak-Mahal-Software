@@ -39,7 +39,7 @@ TRACKED = ('customers','products','prescriptions','sales','sale_items','supplier
 def migrate(store):
     db = store.db
     version = db.execute('PRAGMA user_version').fetchone()[0]
-    if version > 1:
+    if version > 2:
         raise RuntimeError('This database needs a newer Ainak Mahal version. No changes were made.')
     phase6.init(store.db)
     db.executescript(DDL)
@@ -66,4 +66,4 @@ def migrate(store):
                 db.execute(f'''CREATE TRIGGER IF NOT EXISTS journal_{table}_{event} AFTER {event} ON {table}
                   BEGIN INSERT INTO sync_outbox VALUES(lower(hex(randomblob(16))),'{table}',CAST({alias}.{key} AS TEXT),
                   '{event.lower()}',strftime('%Y-%m-%dT%H:%M:%f','now'),NULL); END''')
-        db.execute('PRAGMA user_version=1')
+        if version < 1: db.execute('PRAGMA user_version=1')
