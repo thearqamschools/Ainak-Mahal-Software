@@ -4,9 +4,11 @@ from tkinter import ttk,messagebox,filedialog,simpledialog
 from pathlib import Path
 from core import Store
 import phase3
+import phase4
+import phase5
 import phase6
 import webbrowser
-from deployment_tools import verified_backup, reconcile_stock, reconcile_payments, export_invoice
+from deployment_tools import verified_backup, reconcile_stock, reconcile_payments, export_invoice as write_invoice
 # Authentication is established in-process by launcher.py.
 # Do not accept a user/role supplied via command-line arguments.
 from auth_session import current_session
@@ -17,7 +19,8 @@ class AuthenticatedUser:
     def __init__(self, user, role): self.user=user; self.role=role
 args=AuthenticatedUser(session['username'],session['role'])
 
-DATA=Path.home()/'AinakMahal';DATA.mkdir(exist_ok=True)
+from paths import data_dir
+DATA=data_dir()
 store=Store(DATA/'ainak_mahal.db')
 phase6.init(store.db)
 if not store.db.execute("SELECT 1 FROM app_users WHERE username=? AND role=? AND active=1",(args.user,args.role)).fetchone(): raise PermissionError("Unknown or inactive user")
@@ -90,8 +93,8 @@ def add_supplier():
     with store.db:store.db.execute('INSERT INTO suppliers(name,phone) VALUES(?,?)',(sue['name'].get(),sue['phone'].get()))
 ttk.Button(suf,text='Add Supplier',command=lambda:safe(add_supplier,admin=True)).grid(row=2,column=1)
 recv=ttk.Frame(suppliers);recv.pack(anchor='w',pady=12)
-re=inputs(recv,[('supplier','Supplier ID'),('product','Product ID'),('qty','Received Qty'),('cost','Unit Cost')])
-def purchase():store.receive(int(re['supplier'].get()),[(int(re['product'].get()),int(re['qty'].get()),re['cost'].get())]);pr();messagebox.showinfo('Saved','Stock received')
+receipt_entries=inputs(recv,[('supplier','Supplier ID'),('product','Product ID'),('qty','Received Qty'),('cost','Unit Cost')])
+def purchase():store.receive(int(receipt_entries['supplier'].get()),[(int(receipt_entries['product'].get()),int(receipt_entries['qty'].get()),receipt_entries['cost'].get())]);pr();messagebox.showinfo('Saved','Stock received')
 ttk.Button(recv,text='Receive Stock',command=lambda:safe(purchase,admin=True)).grid(row=4,column=1)
 
 rx=page('Prescriptions');rf=ttk.Frame(rx);rf.pack(anchor='w')
@@ -183,7 +186,7 @@ def do_backup():
 def open_invoice():
     sid=simpledialog.askinteger('Print Invoice','Invoice number',parent=root,minvalue=1)
     if sid:
-        path=export_invoice(store.db,sid,DATA/'invoices')
+        path=write_invoice(store.db,sid,DATA/'invoices')
         webbrowser.open(path.as_uri())
 def check_data():
     stock=reconcile_stock(store.db);payments=reconcile_payments(store.db)

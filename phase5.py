@@ -45,10 +45,13 @@ def return_and_settle(store, sale_id, product_id, qty, reason, actor, role, meth
 def invoice_position(store,sale_id):
     row=store.db.execute('SELECT total,paid FROM sales WHERE id=?',(sale_id,)).fetchone()
     if row is None: raise ValueError('Invoice not found')
-    returned=store.db.execute('SELECT COALESCE(SUM(refund),0) FROM sale_returns WHERE sale_id=?',(sale_id,)).fetchone()[0]
+    returned=store.db.execute('SELECT ROUND(COALESCE(SUM(refund),0),2) FROM sale_returns WHERE sale_id=?',(sale_id,)).fetchone()[0]
     cash=store.db.execute('''SELECT COALESCE(SUM(rs.cash_refund_cents),0) FROM return_settlements rs
        JOIN sale_returns r ON r.id=rs.return_id WHERE r.sale_id=?''',(sale_id,)).fetchone()[0]
+    transfers = 0
+    if store.db.execute("SELECT 1 FROM sqlite_master WHERE name='credit_transfers'").fetchone():
+        transfers = store.db.execute('SELECT COALESCE(SUM(CASE WHEN source_sale_id=? THEN amount_cents ELSE -amount_cents END),0) FROM credit_transfers WHERE source_sale_id=? OR target_sale_id=?',(sale_id,sale_id,sale_id)).fetchone()[0]
     return {'original_total':row[0], 'return_value':returned,
             'net_sale':(money(row[0])-money(returned))/100,
             'payments_received':row[1], 'payout_due':cash/100,
-            'net_customer_balance':(money(row[0])-money(returned)-money(row[1])+cash)/100}
+            'net_customer_balance':(money(row[0])-money(returned)-money(row[1])+cash+transfers)/100}
