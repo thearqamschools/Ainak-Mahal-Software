@@ -1,7 +1,7 @@
 # Ainak Mahal · Offline Windows optical store
 
 A native Windows desktop application for Ainak Mahal, Millat Chowk, Faisalabad.
-Implemented against [Issue #1](https://github.com/thearqamschools/Ainak-Mahal-Software/issues/1).
+Version 1.1 design upgrade follows [Issue #4](https://github.com/thearqamschools/Ainak-Mahal-Software/issues/4), building on the unmerged implementation in PR #2. Original scope: [Issue #1](https://github.com/thearqamschools/Ainak-Mahal-Software/issues/1).
 No runtime internet connection, Python installation, hosting or subscription is required
 when installed using `AinakMahal_Setup.exe`.
 
@@ -15,7 +15,7 @@ and run `python launcher.py`. Keep `app.py` and `legacy_launcher.py` for legacy 
 Customer, prescription, inventory, barcode checkout, partial payment, returns/refund payouts,
 store-credit redemption, lab jobs, supplier/PO receipt, cash/expenses, closing, reports,
 printing, staff administration and verified backup/recovery are available through the sidebar.
-F2 opens checkout; F3 opens customers; Ctrl+Enter saves a sale.
+F2 opens checkout; F3 opens customers; Ctrl+Enter saves a sale. Ctrl+K opens global search; Ctrl+Shift+P changes your password. Inventory and jobs have combined filters; table headings sort records.
 
 ## Data and upgrade
 
@@ -67,3 +67,9 @@ closings are immutable snapshots; complete all trading activity first. Store-cre
 redemption is available between invoices for the same named customer. The installer is
 unsigned; a signing certificate has not been provided. Review the verification report
 and complete the hardware/clean-machine checklist before shop rollout.
+
+## Design upgrade review
+
+See the [handover audit and feature matrix](docs/ISSUE_4_AUDIT.md), [brand guide](docs/BRAND_GUIDE.md), [actual screenshot gallery](docs/SCREENSHOT_GALLERY.md), and [version 1.1 verification](docs/V1_1_REVIEW.md).
+
+![First-run desktop](docs/screenshots/01-first-run.png)

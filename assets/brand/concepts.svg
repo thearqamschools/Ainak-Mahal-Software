@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 200" role="img" aria-label="Three original Ainak Mahal eyeglasses concepts">
+<rect width="660" height="200" fill="#F8FAFC"/>
+<g fill="none" stroke="#142D4E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+<g transform="translate(35 10) scale(2)"><path d="M13 23 Q8 23 8 28 L9 36 Q10 41 15 41 L23 41 Q28 41 28 35 L28 23 Z M41 23 Q36 23 36 28 L36 35 Q36 41 41 41 L49 41 Q54 41 55 36 L56 28 Q56 23 51 23 Z M3 23 L8 26 M56 26 L61 23"/><path d="M28 28 Q32 23 36 28" stroke="#0D9488"/></g>
+<g transform="translate(255 20)"><circle cx="35" cy="53" r="23"/><circle cx="96" cy="53" r="23"/><path d="M58 49 Q65 43 73 49" stroke="#0D9488"/><path d="M2 40 L12 44 M119 44 L130 40"/></g>
+<g transform="translate(480 30)"><path d="M5 12 L51 12 L48 57 L14 57 Z M73 12 L119 12 L110 57 L76 57 Z M0 8 L5 15 M119 15 L126 8"/><path d="M51 22 Q62 15 73 22" stroke="#0D9488"/></g></g>
+<g font-family="sans-serif" font-size="14" fill="#142D4E"><text x="45" y="145">01 / Soft frame · Selected</text><text x="270" y="145">02 / Round frame</text><text x="490" y="145">03 / Angular frame</text></g></svg>

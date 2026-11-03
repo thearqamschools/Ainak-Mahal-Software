@@ -15,8 +15,18 @@ def run():
         from phase4 import restore_database
         with tempfile.TemporaryDirectory(prefix='ainak_smoke_') as temp:
             path=Path(temp)/'test.db';s=Retail(path)
-            root=tk.Tk();sign_in(root,s,lambda:None);root.update()
-            s.bootstrap('smoke-admin','test-password','test-password')
+            root=tk.Tk();authenticated=[]
+            sign_in(root,s,lambda:authenticated.append('created'));root.update()
+            controls=root.sign_in_controls
+            controls['values']['username'].set('smoke-admin')
+            controls['values']['password'].set('test-password')
+            controls['values']['confirm'].set('test-password');controls['submit']()
+            assert authenticated==['created']
+            sign_in(root,s,lambda:authenticated.append('signed-in'));root.update()
+            controls=root.sign_in_controls
+            controls['values']['username'].set('smoke-admin');controls['values']['password'].set('test-password');controls['submit']()
+            assert authenticated==['created','signed-in']
+            assert (Path(__file__).resolve().parent/'assets'/'brand'/'ainak-icon.png').exists()
             cid=s.customer('Smoke Customer','03000000000');pid=s.product('SMK','Frame',1500,500,4,'Frames')
             sid,total,due=s.checkout([(pid,1)],cid,500)
             s.pay(sid,1000,'Cash')

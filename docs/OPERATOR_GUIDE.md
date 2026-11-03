@@ -130,3 +130,39 @@ day. Export reports, check reconciliation, back up, close, restore and verify al
 Test real A4/80 mm printer output, scanner Enter suffix, keyboard navigation and Windows
 display scaling before daily use. `AinakMahal.exe --smoke-test` runs an isolated automated
 sample without touching the live data folder.
+
+## Version 1.1: finding records and managing access
+
+Press **Ctrl+K** anywhere in the main desktop to search customer names/mobile numbers,
+product names/SKUs/barcodes, lab instructions or an invoice number (`#123` also works).
+Select a result and press Enter to open its page and select that record. Escape closes
+search. Results are limited to 12; refine broad searches. All searching stays offline.
+Click table headings to sort; click again to reverse. Empty tables explain the next step.
+
+Inventory supports combined category, stock and text filters. Low stock means quantity
+at or below its reorder level; service items are excluded. Optical jobs supports status,
+overdue, and customer/instruction filtering. Overdue means an unfinished job whose promised
+date is before today. Dashboard's counter selector switches jobs, recent invoices and low stock.
+
+Checkout keeps Save sale and Clear cart visible at the bottom of its summary. On smaller
+windows, scroll the payment panel; Tab also reveals its inputs. Scan/search, Enter adds an
+item, Ctrl+Enter saves the sale. Enter only the amount retained, excluding cash change.
+
+Reports now also includes Collections (receipts before refund payouts), Purchases (goods
+receipts within the date range), Low stock and Stock valuation. Stock and valuation are
+current positions, not historical snapshots; valuation uses current unit cost, excludes
+services and is not a statutory accounting report. All can be exported as CSV.
+
+Sign-in supports Show password for both new-password fields, Enter submission and normal
+Tab navigation. There is no default or universal recovery password. Use at least ten
+characters and store credentials safely. **Ctrl+Shift+P** changes the signed-in user's
+password after confirming their current password. Administrators can also use Settings
+& team → Change my password or select a staff account → Reset staff password. Resetting
+requires the administrator's current password, is audited, and does not reactivate a
+disabled account. Passwords are stored as salted PBKDF2 hashes, never in the audit log.
+
+If you cannot sign in, ask another active administrator to reset your account. If no
+administrator can authenticate, keep the database and backups intact and arrange
+technician-assisted recovery. The sign-in help does not bypass authentication and the
+Recovery tool still requires current administrator credentials. Never delete shop data
+merely to recover access. Normal installation/upgrades leave the data directory intact.
