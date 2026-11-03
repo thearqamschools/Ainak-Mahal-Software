@@ -19,3 +19,5 @@ The chosen softly rectangular frame is an optical-store identifier with a compac
 Segoe UI on Windows; supported DejaVu Sans/Helvetica fallback for Linux development. Body 10pt; secondary 9pt; screen titles 26pt; values 25pt. Use 8/12/16/24px rhythm. White-on-blue primary actions, high-contrast focus and selected-row treatment, explicit labels and scrollbar access. Never encode an essential status by colour alone.
 
 Motion is limited to native hover, focus and press feedback. Account retry delay is a visible disabled state and rate-limiting feedback, not decorative motion. There are no fades, animated page transitions or chart motion; POS responds immediately and works offline.
+
+Light artwork uses navy/teal on a light surface. `ainak-mark-dark.svg/png` and `ainak-lockup-dark.svg` use white/mint transparent artwork for navy surfaces; `ainak-lockup-dark.png` includes the navy background. Do not place white dark-surface artwork on white paper; printed documents use the navy light-surface mark.

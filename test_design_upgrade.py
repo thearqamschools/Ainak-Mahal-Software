@@ -84,6 +84,32 @@ class ServiceUpgradeTests(unittest.TestCase):
             self.assertNotIn('<script src=',document)
             self.assertNotIn('<img src="http',document)
 
+    def test_customer_position_separates_credit_from_unpaid_invoices(self):
+        cid=self.s.customer('Customer with credit')
+        pid=self.s.product('POSITION','Frame',1000,400,5,'Frames')
+        paid,_,_=self.s.checkout([(pid,1)],cid,1000)
+        self.s.checkout([(pid,1)],cid,100)
+        self.s.return_item(paid,pid,1,'Exchange','Credit')
+        self.assertEqual(self.s.customer_position(cid),{'invoices':2,'due_cents':90000,'credit_cents':100000})
+        other=self.s.customer('Different customer')
+        self.assertEqual(self.s.customer_position(other)['invoices'],0)
+        with self.assertRaises(ValueError):self.s.customer_position(99999)
+
+    def test_supplier_history_is_scoped_to_actual_received_goods(self):
+        first=self.s.supplier('First supplier','03000000000');other=self.s.supplier('Other supplier','')
+        pid=self.s.product('HISTORY','Frame',1000,400,5,'Frames')
+        po=self.s.create_po(first,[(pid,2,250)])
+        receipts,items,orders=self.s.supplier_history(first)
+        self.assertEqual(receipts,[]);self.assertEqual(items,[]);self.assertEqual(orders[0][0],po)
+        self.s.receive_po(po);self.s.receive(other,[(pid,3,300)])
+        receipts,items,orders=self.s.supplier_history(first)
+        self.assertEqual(len(receipts),1);self.assertEqual(receipts[0][2],500)
+        self.assertEqual(items[0][2:],[('HISTORY','Frame',2,250)][0])
+        self.assertEqual(orders[0][2],'Received')
+        with self.assertRaises(ValueError):self.s.supplier_history(99999)
+        self.s.role=None
+        with self.assertRaises(PermissionError):self.s.supplier_history(first)
+
 
 class DesktopUpgradeTests(unittest.TestCase):
     def setUp(self):

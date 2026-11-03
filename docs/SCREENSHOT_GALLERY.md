@@ -21,5 +21,7 @@ Reproduce from the checkout with a display and development-only Pillow: `python 
 | Settings and team | [PNG](screenshots/13-settings-team.png) |
 | Backup and recovery | [PNG](screenshots/14-backup-recovery.png) |
 | Global search | [PNG](screenshots/15-global-search.png) |
+| Supplier history | [PNG](screenshots/16-supplier-history.png) |
+| Customer history | [PNG](screenshots/17-customer-history.png) |
 
 [Original setup](screenshots/baseline/setup.png) and [original overview](screenshots/baseline/overview.png) preserve the PR #2 baseline, including its original Linux font fallback behavior. Visual checks at 1280×850 and automated action-visibility checks at 1050×700 do not establish screen-reader, Windows scaling, printer or operator approval.

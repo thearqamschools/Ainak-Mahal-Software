@@ -300,6 +300,8 @@ class Desktop:
         def history():
             row=grid.selected();sales,rx=self.s.history(row[0]);w=tk.Toplevel(self.root);w.title(row[1]+' · History');w.geometry('900x600')
             ttk.Label(w,text=row[1]+' · Sales',font=(FONT,16,'bold')).pack(anchor='w',padx=16,pady=12)
+            position=self.s.customer_position(row[0])
+            ttk.Label(w,text=f'{position["invoices"]} invoices  ·  Balance due PKR {position["due_cents"]/100:,.2f}  ·  Store credit PKR {position["credit_cents"]/100:,.2f}',style='Muted.TLabel').pack(anchor='w',padx=16)
             Grid(w,('Invoice','Date','Total PKR','Paid PKR'),sales,height=5)
             ttk.Label(w,text='Prescription history',font=(FONT,14,'bold')).pack(anchor='w',padx=16)
             Grid(w,('Rx','Customer','Date','OD SPH','OD CYL','OD AXIS','OD ADD','OS SPH','OS CYL','OS AXIS','OS ADD','PD','Notes'),rx,height=5)
@@ -482,12 +484,36 @@ class Desktop:
                 w.destroy();self.notice.set('Goods received.' if direct else 'Purchase order saved.');self.refresh()
             self.button(bar,'Receive goods' if direct else 'Save purchase order',save,True)
         self.button(bar,'Create purchase order',order,True);self.button(bar,'Receive without PO',lambda:order(True))
+        self.button(bar,'Supplier history',self.supplier_history)
         grid=Grid(self.body,('PO #','Supplier','Created','Status'),self.s.purchase_orders())
         def receive():
             row=grid.selected()
             if messagebox.askyesno('Receive purchase order',f'Receive every line on PO #{row[0]}? Verify the delivered quantities first.',parent=self.root):
                 self.s.receive_po(row[0]);self.notice.set('Purchase order received. Stock and costs updated.');self.refresh()
         self.button(self.toolbar(),'Receive selected PO',receive)
+    def supplier_history(self):
+        suppliers={f'{name} · {phone or "no phone"} [#{sid}]':sid for sid,name,phone in self.s.suppliers()}
+        if not suppliers:raise ValueError('Add a supplier first')
+        win=tk.Toplevel(self.root);win.title('Supplier history');win.geometry('1000x700');win.transient(self.root)
+        shell=ttk.Frame(win,padding=24);shell.pack(fill='both',expand=True)
+        ttk.Label(shell,text='Supplier history',font=(FONT,21,'bold')).pack(anchor='w')
+        ttk.Label(shell,text='Received goods and purchase orders. Receipt totals are not supplier balances.',style='Muted.TLabel').pack(anchor='w',pady=(6,16))
+        choice=tk.StringVar(value=next(iter(suppliers)))
+        selector=ttk.Combobox(shell,textvariable=choice,values=list(suppliers),state='readonly');selector.pack(fill='x')
+        summary=tk.StringVar();ttk.Label(shell,textvariable=summary,style='Muted.TLabel').pack(anchor='w',pady=12)
+        notebook=ttk.Notebook(shell);notebook.pack(fill='both',expand=True)
+        grids=[]
+        for title,columns in (('Receipts',('Receipt','Date','Total PKR')),('Received items',('Receipt','Date','SKU','Product','Units','Unit cost PKR')),('Purchase orders',('PO','Date','Status'))):
+            page=ttk.Frame(notebook,padding=8);notebook.add(page,text=title);grids.append(Grid(page,columns))
+        def load(event=None):
+            rows=self.s.supplier_history(suppliers[choice.get()])
+            for grid,data in zip(grids,rows):grid.replace(data)
+            from core import money
+            total=sum(money(r[2]) for r in rows[0])
+            summary.set(f'{len(rows[0])} goods receipts · Received value PKR {total/100:,.2f} · {len(rows[2])} purchase orders')
+        selector.bind('<<ComboboxSelected>>',lambda e:self.safe(load));load()
+        ttk.Button(shell,text='Close',command=win.destroy).pack(anchor='e',pady=(12,0))
+        win.bind('<Escape>',lambda e:win.destroy())
     def payments(self):
         bar=self.toolbar()
         grid=Grid(self.body,('Invoice','Customer','Date','Total PKR','Paid PKR','Balance PKR'),self.s.sales(),height=5);self.page_grid=grid

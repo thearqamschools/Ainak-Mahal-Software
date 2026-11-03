@@ -49,7 +49,8 @@ def main():
                 job=service.job(cid,('AR coating · navy frame','New lenses · customer frame','Adjust temples · repair','Single vision · clear lenses')[i],(today+timedelta(days=i-1)).isoformat(),sale,rx)
                 if i in (1,2):service.advance_job(job,'In Lab')
                 if i==1:service.advance_job(job,'Ready')
-            service.supplier('Faisal Optical Supplies','041 0000000')
+            supplier=service.supplier('Faisal Optical Supplies','041 0000000')
+            service.receive(supplier,[(frames[0],3,1800)])
             service.cash('Opening',5000,'Morning float');service.expense('Lab delivery',250)
             for child in root.winfo_children():child.destroy()
             root.resizable(True,True);ui=Desktop(root,service)
@@ -67,8 +68,20 @@ def main():
                     if isinstance(child,tk.ttk.Entry):yield child
                     yield from entries(child)
             next(entries(win)).insert(0,'Ali');capture(win,out/'15-global-search.png');win.destroy()
+            ui.show('Purchasing');ui.supplier_history();root.update()
+            win=next(w for w in root.winfo_children() if isinstance(w,tk.Toplevel))
+            capture(win,out/'16-supplier-history.png');win.destroy()
+            ui.show('Customers');root.update()
+            key=next(key for key,row in ui.page_grid.data.items() if row[0]==customers[0]);ui.page_grid.tree.selection_set(key)
+            def buttons(widget):
+                for child in widget.winfo_children():
+                    if isinstance(child,tk.ttk.Button):yield child
+                    yield from buttons(child)
+            next(w for w in buttons(ui.body) if w.cget('text')=='View sales & Rx history').invoke();root.update()
+            win=next(w for w in root.winfo_children() if isinstance(w,tk.Toplevel))
+            capture(win,out/'17-customer-history.png');win.destroy()
             if errors:raise RuntimeError('; '.join(errors))
-            print('Captured 15 actual desktop windows in',out)
+            print('Captured 17 actual desktop windows in',out)
         finally:
             root.destroy();service.close()
 

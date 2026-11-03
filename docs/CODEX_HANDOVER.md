@@ -26,3 +26,11 @@ No default username or password. Fresh installation must let the operator create
 
 ## Codex execution instruction
 Read this file and Issue #4 in full, then Issue #1 and PR #2. **Start from the latest working PR #2 branch**, not the outdated `main` code. Continue autonomously from audit and logo to complete offline desktop UI/UX redesign, functionality, automated tests and installer. Preserve functionality and history, work on a reviewable branch/PR, do not auto-merge. Request missing reference attachments only if they are not accessible. Distinguish verified work from remaining checks.
+
+## Continuation update · 3 November 2026
+
+The review branch `feat/issue-4-continuation` is based on the latest implementation/handover commit `f3de6edc7a6406f456405d427767cb47f058ee5c`. It carries forward the completed design work from `feat/issue-4-design-upgrade`, preserving both original branch histories. No PR has been merged.
+
+Implemented: original light/dark SVG/PNG/ICO brand, 12-page UI redesign, accessible sign-in states/password visibility, bounded Ctrl+K search, sortable tables, inventory/job filters, fixed checkout actions, operational reports, password change/admin reset with audit, customer balance/credit and supplier history. Runtime remains offline and standard-library-only. Tkinter was retained after evaluating preservation risk versus UX gains. Named design principles were applied directly; those external skills and Asaan attachments were unavailable.
+
+Continue from this review branch when reviewing these additions; starting from the older implementation alone would discard them. Read `docs/ISSUE_4_AUDIT.md`, `docs/BRAND_GUIDE.md`, `docs/SCREENSHOT_GALLERY.md`, and `docs/V1_1_REVIEW.md` for current artifacts and exact verification boundaries. Windows packaging must pass for the exact reviewed commit. Physical hardware, pristine Windows installation, accessibility and operator approval remain external acceptance checks. Do not merge without approval or delete any shop data.

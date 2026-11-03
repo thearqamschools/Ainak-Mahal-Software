@@ -123,6 +123,12 @@ class Retail:
     def history(self, cid):
         self.authorize()
         return self.rows('SELECT id,date,total,paid FROM sales WHERE customer_id=? ORDER BY id DESC',(cid,)), self.prescriptions(cid)
+    def customer_position(self,cid):
+        self.authorize()
+        if not self.scalar('SELECT COUNT(*) FROM customers WHERE id=?',(cid,)):raise ValueError('Customer not found')
+        balances=[phase5.invoice_position(self.store,sid)['net_customer_balance'] for sid, in self.rows('SELECT id FROM sales WHERE customer_id=?',(cid,))]
+        return {'invoices':len(balances),'due_cents':sum(money(v) for v in balances if v>0),
+                'credit_cents':sum(money(-v) for v in balances if v<0)}
     def products(self, search=''):
         self.authorize(); term='%'+search+'%'
         return self.rows('''SELECT p.id,p.sku,p.name,p.category,p.price,p.qty,COALESCE(d.barcode,''),
@@ -268,6 +274,15 @@ class Retail:
             if status=='Delivered': self.db.execute('UPDATE job_details SET delivered_at=? WHERE job_id=?',(now(),jid))
     def suppliers(self):
         self.authorize(); return self.rows('SELECT id,name,phone FROM suppliers ORDER BY name')
+    def supplier_history(self,sid):
+        self.authorize()
+        if not self.scalar('SELECT COUNT(*) FROM suppliers WHERE id=?',(sid,)):raise ValueError('Supplier not found')
+        receipts=self.rows('SELECT id,date,total FROM purchases WHERE supplier_id=? ORDER BY id DESC',(sid,))
+        items=self.rows('''SELECT p.id,p.date,c.sku,c.name,i.qty,i.cost FROM purchase_items i
+          JOIN purchases p ON p.id=i.purchase_id JOIN products c ON c.id=i.product_id
+          WHERE p.supplier_id=? ORDER BY p.id DESC,i.id''',(sid,))
+        orders=self.rows('SELECT id,created_at,status FROM purchase_orders WHERE supplier_id=? ORDER BY id DESC',(sid,))
+        return receipts,items,orders
     def supplier(self,name,phone):
         self.authorize(True)
         with self.db:

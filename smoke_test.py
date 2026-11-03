@@ -50,6 +50,11 @@ def run():
                 for button in buttons(root):
                     if not button.winfo_ismapped() or button.winfo_rooty()+button.winfo_height()>root.winfo_rooty()+root.winfo_height():
                         raise AssertionError(f'Action clipped at minimum window size: {page}: {button.cget("text")}')
+            ui.show('Purchasing');ui.supplier_history();root.update()
+            history=next(w for w in root.winfo_children() if isinstance(w,tk.Toplevel))
+            assert history.title()=='Supplier history'
+            assert len(s.supplier_history(supplier)[0])==1
+            history.destroy()
             if errors:raise RuntimeError('; '.join(errors))
             for kind,ref in (('Invoice',sid),('Prescription',rx),('Job',job)):
                 assert s.print_document(kind,ref,temp).exists()

@@ -166,3 +166,14 @@ administrator can authenticate, keep the database and backups intact and arrange
 technician-assisted recovery. The sign-in help does not bypass authentication and the
 Recovery tool still requires current administrator credentials. Never delete shop data
 merely to recover access. Normal installation/upgrades leave the data directory intact.
+
+### Customer and supplier history
+
+Customers → select a customer → View sales & Rx history shows invoice count, unpaid
+balances and available store credit separately. Credit does not silently offset another
+invoice: use the explicit Apply store credit workflow to allocate it.
+
+Purchasing → Supplier history lists receipts, received items (including units and unit
+cost), and purchase orders for the selected supplier. Switch the supplier at the top.
+A purchase order is not a receipt until goods are received. Received value is not a
+supplier payable balance; this version does not record supplier settlements.
