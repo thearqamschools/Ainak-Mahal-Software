@@ -125,6 +125,9 @@ class DesktopUpgradeTests(unittest.TestCase):
         self.assertEqual(grid.data['0'][1],'Ali')
         grid.sort(1);self.assertEqual(grid.data['0'][1],'Zara')
         grid.replace([]);self.root.update();self.assertTrue(grid.empty.winfo_ismapped())
+        amount=Grid(self.root,('Price PKR',),[(2500.5,)])
+        self.assertEqual(amount.tree.item('0','values'),('2,500.50',))
+        amount.tree.selection_set('0');self.assertEqual(amount.selected()[0],2500.5)
 
     def test_global_search_opens_and_selects_actual_record(self):
         import tkinter as tk
