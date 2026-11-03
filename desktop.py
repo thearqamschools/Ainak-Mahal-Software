@@ -50,6 +50,7 @@ def theme(root):
 
 class Grid:
     def __init__(self,parent,columns,rows=(),height=12):
+        self.columns=columns
         self.frame=ttk.Frame(parent);self.frame.pack(fill='both',expand=True,pady=10)
         # Request a compact minimum, then expand into available space. A fixed tall
         # request otherwise pushes later financial actions outside a 700px window.
@@ -75,7 +76,8 @@ class Grid:
             rows.sort(key=lambda r:(r[col] is None,r[col] if isinstance(r[col],(int,float)) else str(r[col]).casefold()),reverse=self.descending)
         self.tree.delete(*self.tree.get_children());self.data={}
         for i,row in enumerate(rows):
-            self.tree.insert('','end',iid=str(i),values=['—' if v is None or v=='' else v for v in row],tags=('odd' if i%2 else 'even',));self.data[str(i)]=row
+            values=['—' if v is None or v=='' else f'{v:,.2f}' if isinstance(v,(int,float)) and 'PKR' in self.columns[col] else v for col,v in enumerate(row)]
+            self.tree.insert('','end',iid=str(i),values=values,tags=('odd' if i%2 else 'even',));self.data[str(i)]=row
             if previous and row[0]==previous[0]:self.tree.selection_set(str(i))
         if rows:self.empty.place_forget()
         else:self.empty.place(relx=.5,rely=.5,anchor='center')
@@ -219,6 +221,7 @@ class Desktop:
         f=ttk.Frame(self.body);f.pack(fill='x',pady=(0,4));return f
     def refresh(self):self.show(self.current)
     def show(self,name):
+        if self.current!=name:self.notice.set('Ready. All changes are saved on this computer.')
         self.current=name;self.page_grid=None
         for child in self.body.winfo_children():child.destroy()
         for n,b in self.nav.items():b.configure(bg='#2856A0' if n==name else NAVY,fg=WHITE if n==name else '#DFE8F5')
@@ -254,7 +257,13 @@ class Desktop:
             f=ttk.Frame(cards,style='Card.TFrame',padding=(18,12));f.grid(row=i//3,column=i%3,sticky='nsew',padx=(0,10),pady=(0,10))
             cards.columnconfigure(i%3,weight=1,uniform='metric')
             ttk.Label(f,text=label.upper(),style='Card.TLabel',foreground=MUTED,font=(FONT,9,'bold')).pack(anchor='w')
-            ttk.Label(f,text=f'PKR {value:,.0f}' if i<3 else str(value),style='Metric.TLabel').pack(anchor='w',pady=(7,5))
+            metric=ttk.Label(f,text=f'PKR {value:,.0f}' if i<3 else str(value),style='Metric.TLabel')
+            metric.pack(anchor='w',pady=(7,5))
+            def fit_metric(event,widget=metric):
+                room=max(80,event.width-36)
+                size=next((n for n in (25,23,21,19,17,15,13,11) if tkfont.Font(family=FONT,size=n,weight='bold').measure(widget.cget('text'))<=room),11)
+                widget.configure(font=(FONT,size,'bold'))
+            f.bind('<Configure>',fit_metric)
             ttk.Label(f,text=notes[i],style='Card.TLabel',foreground=TEAL if i==5 else MUTED,font=(FONT,9)).pack(anchor='w')
         row=ttk.Frame(self.body);row.pack(fill='x',pady=(6,0))
         ttk.Label(row,text='At the counter',font=(FONT,15,'bold'),foreground=NAVY).pack(side='left')
@@ -278,6 +287,7 @@ class Desktop:
         Dialog(self,'Customer',[('name','Full name *','',row[1] if row else ''),('phone','Mobile number','',row[2] if row else ''),('address','Address','',row[3] if row else '')],lambda v:self.s.customer(v['name'],v['phone'],v['address'],row[0] if row else None))
     def customers(self):
         bar=self.toolbar();self.button(bar,'Add customer',self.new_customer,True)
+        ttk.Label(bar,text='Name or mobile',style='Muted.TLabel').pack(side='left',padx=(12,8))
         search=tk.StringVar();e=ttk.Entry(bar,textvariable=search);e.pack(side='right',fill='x',expand=True,padx=(30,0))
         grid=Grid(self.body,('Customer #','Name','Mobile','Address'),self.s.customers());self.page_grid=grid
         search.trace_add('write',lambda *_:grid.replace(self.s.customers(search.get())))
@@ -384,6 +394,7 @@ class Desktop:
             fields=[('sku','SKU *'),('name','Product name *'),('category','Category',('Frames','Lenses','Sunglasses','Accessories','Service')),('price','Selling price (PKR) *'),('cost','Unit cost (PKR)','',0),('qty','Opening stock','',0),('barcode','Barcode (optional)'),('variant','Variant / size / colour'),('sph','Lens SPH (optional)'),('cyl','Lens CYL (optional)'),('reorder','Low stock threshold','',2)]
             Dialog(self,'Catalog item',fields,lambda v:self.s.product(v['sku'],v['name'],v['price'],v['cost'],v['qty'],v['category'],v['barcode'],v['variant'],v['sph'],v['cyl'],v['reorder'],v['category']=='Service'))
         self.button(bar,'Add catalog item',new,True)
+        ttk.Label(bar,text='Name, SKU or barcode',style='Muted.TLabel').pack(side='left',padx=(12,8))
         search=tk.StringVar();ttk.Entry(bar,textvariable=search).pack(side='right',fill='x',expand=True,padx=(30,0))
         grid=Grid(self.body,('ID','SKU','Name','Category','Price PKR','Stock','Barcode','Variant','Reorder','Service'),self.s.products());self.page_grid=grid
         filters=ttk.Frame(self.body);filters.pack(fill='x',before=grid.frame)
