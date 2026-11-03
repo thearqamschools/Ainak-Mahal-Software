@@ -36,7 +36,7 @@ try {
     if ($env:GITHUB_ACTIONS) {
         $details = $_.Exception.Message
         foreach ($log in @('test-results/unit-tests.log','test-results/source-smoke.log')) {
-            if (Test-Path $log) { $details += "`n$log`n" + ((Get-Content $log -Tail 65) -join "`n") }
+            if (Test-Path $log) { $details += "`n$log`n" + ((Get-Content $log -Tail 22) -join "`n") }
         }
         $details = $details.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
         Write-Output "::error title=Windows build diagnostics::$details"

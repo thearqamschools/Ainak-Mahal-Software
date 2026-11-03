@@ -141,6 +141,7 @@ class DesktopUpgradeTests(unittest.TestCase):
                 yield child;yield from descendants(child)
         entry=next(w for w in descendants(ui.search_window) if isinstance(w,ttk.Entry))
         entry.insert(0,'Search Person');self.root.update()
+        self.assertEqual(self.root.focus_get(),entry)
         entry.event_generate('<Return>');self.root.update()
         self.assertEqual(ui.current,'Customers');self.assertEqual(ui.page_grid.selected()[0],cid)
         self.assertFalse(ui.search_window.winfo_exists())

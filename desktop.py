@@ -207,8 +207,13 @@ class Desktop:
             self.notice.set(f'{row[0]} #{row[1]} · {row[2]}')
         query.trace_add('write',lambda *_:self.safe(find))
         entry.bind('<Return>',activate);grid.tree.bind('<Return>',activate);grid.tree.bind('<Double-1>',activate)
-        win.bind('<Escape>',lambda e:win.destroy());entry.focus_set()
-        ttk.Label(shell,text='Enter to open selected result · Escape to close',style='Muted.TLabel').pack(anchor='w')
+        win.bind('<Escape>',lambda e:win.destroy())
+        footer=ttk.Frame(shell);footer.pack(fill='x')
+        ttk.Label(footer,text='Enter to open selected result · Escape to close',style='Muted.TLabel').pack(side='left')
+        ttk.Button(footer,text='Open selected',command=activate,style='Primary.TButton').pack(side='right')
+        # Windows cannot reliably focus an Entry before its Toplevel is mapped.
+        # Map first, then establish modal keyboard ownership, as with other dialogs.
+        win.wait_visibility();win.grab_set();entry.focus_force()
     def exit(self):
         if self.cart and not messagebox.askyesno('Unsaved cart','Discard the current cart and close Ainak Mahal?',parent=self.root):return
         self.s.close();self.root.destroy()
