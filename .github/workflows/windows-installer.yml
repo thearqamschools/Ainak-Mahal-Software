@@ -2,7 +2,7 @@ name: Build Windows installer
 on:
   workflow_dispatch:
   push:
-    branches: [main, 'feature/**']
+    branches: [main, 'feature/**', 'feat/**']
   pull_request:
 permissions:
   contents: read
@@ -24,6 +24,13 @@ jobs:
       - name: Smoke test installed app and upgrade
         shell: pwsh
         run: ./tools/installer-smoke.ps1
+      - name: Capture Windows desktop gallery
+        shell: pwsh
+        run: |
+          python -m pip install Pillow==13.0.0
+          if ($LASTEXITCODE) { throw 'Screenshot dependency installation failed' }
+          python tools/capture_gallery.py --output test-results/screenshots
+          if ($LASTEXITCODE) { throw 'Desktop screenshot capture failed' }
       - name: Record checksum
         shell: pwsh
         run: Get-FileHash output/AinakMahal_Setup.exe -Algorithm SHA256 | Format-List | Out-File output/SHA256.txt
@@ -34,5 +41,6 @@ jobs:
             output/AinakMahal_Setup.exe
             output/SHA256.txt
             test-results/installed-smoke.json
+            test-results/screenshots/*.png
           if-no-files-found: error
           retention-days: 30

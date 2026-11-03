@@ -3,6 +3,7 @@ import csv
 import html
 import sqlite3
 import uuid
+import secrets
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -76,6 +77,37 @@ class Retail:
         with self.db:
             self.db.execute('UPDATE app_users SET active=? WHERE username=?',(int(active),username))
             self.audit('user_active',username)
+    def change_password(self, current_password, new_password, confirm, username=None):
+        """Require fresh authentication; another account can only be reset by an admin."""
+        self.authorize(admin=username is not None and username != self.actor)
+        if phase3.authenticate(self.db,self.actor,current_password) != self.role:
+            raise ValueError('Your current password is incorrect')
+        target=username if username is not None else self.actor
+        if new_password != confirm: raise ValueError('Passwords do not match')
+        if len(new_password)<10: raise ValueError('Use a password of at least 10 characters')
+        if not self.scalar('SELECT COUNT(*) FROM app_users WHERE username=?',(target,)):
+            raise ValueError('Staff account not found')
+        # Reuse exactly the existing salted PBKDF2 representation.
+        salt=secrets.token_hex(16);digest=phase3.hash_password(new_password,salt)
+        with self.db:
+            self.db.execute('UPDATE app_users SET salt=?,password_hash=? WHERE username=?',(salt,digest,target))
+            self.audit('change_password' if target==self.actor else 'reset_staff_password',target)
+
+    def search(self, query, limit=12):
+        """Bounded, read-only search across people, catalog, jobs and invoices."""
+        self.authorize()
+        query=query.strip()
+        if not query: return []
+        limit=max(1,min(int(limit),30));term='%'+query+'%'
+        result=[]
+        sources=(
+            ('Customer','Customers','SELECT id,name,COALESCE(phone,\'\') FROM customers WHERE name LIKE ? OR phone LIKE ? ORDER BY name LIMIT ?', (term,term,limit)),
+            ('Product','Inventory',"SELECT p.id,p.name,p.sku FROM products p LEFT JOIN product_details d ON d.product_id=p.id WHERE p.name LIKE ? OR p.sku LIKE ? OR d.barcode LIKE ? ORDER BY p.name LIMIT ?",(term,term,term,limit)),
+            ('Job','Optical jobs','SELECT j.id,c.name,j.description FROM optical_jobs j JOIN customers c ON c.id=j.customer_id WHERE j.description LIKE ? OR c.name LIKE ? ORDER BY j.created_at DESC LIMIT ?',(term,term,limit)),
+            ('Invoice','Payments & returns',"SELECT s.id,COALESCE(c.name,'Walk-in'),printf('PKR %.2f',s.total) FROM sales s LEFT JOIN customers c ON c.id=s.customer_id WHERE CAST(s.id AS TEXT)=? OR c.name LIKE ? ORDER BY s.id DESC LIMIT ?",(query.lstrip('#'),term,limit)))
+        for kind,page,sql,args in sources:
+            result.extend((kind,identifier,name,detail,page) for identifier,name,detail in self.rows(sql,args))
+        return result[:limit]
     def customers(self, search=''):
         self.authorize()
         term='%'+search+'%'
@@ -324,6 +356,18 @@ class Retail:
         if start>end: raise ValueError('Start date must be before the end date')
         if kind=='Sales': return ('Invoice','Customer','Date','Total PKR','Paid PKR','Due PKR'),[r for r in self.sales() if start<=r[2][:10]<=end]
         if kind=='Stock': return ('ID','SKU','Name','Category','Price PKR','Stock','Barcode','Variant','Reorder','Service'),self.products()
+        if kind=='Low stock':
+            return ('ID','SKU','Name','Category','Price PKR','Stock','Barcode','Variant','Reorder','Service'),[r for r in self.products() if not r[9] and r[5]<=r[8]]
+        if kind=='Stock valuation':
+            return ('SKU','Product','Units','Unit cost PKR','Value PKR'),self.rows('''SELECT p.sku,p.name,p.qty,p.cost,ROUND(p.qty*p.cost,2)
+              FROM products p LEFT JOIN product_details d ON d.product_id=p.id WHERE COALESCE(d.is_service,0)=0 ORDER BY p.name''')
+        if kind=='Purchases':
+            return ('Receipt','Supplier','Date','Total PKR'),self.rows('''SELECT p.id,COALESCE(s.name,'Unknown'),p.date,p.total
+              FROM purchases p LEFT JOIN suppliers s ON s.id=p.supplier_id WHERE substr(p.date,1,10) BETWEEN ? AND ? ORDER BY p.id DESC''',(start,end))
+        if kind=='Collections':
+            return ('Invoice','Customer','Received','Method','Amount PKR'),self.rows('''SELECT p.sale_id,COALESCE(c.name,'Walk-in'),p.created_at,p.method,p.amount
+              FROM customer_payments p JOIN sales s ON s.id=p.sale_id LEFT JOIN customers c ON c.id=s.customer_id
+              WHERE substr(p.created_at,1,10) BETWEEN ? AND ? ORDER BY p.created_at DESC''',(start,end))
         if kind=='Customer dues': return ('Invoice','Customer','Date','Total PKR','Paid PKR','Due PKR'),[r for r in self.sales() if r[5]>0]
         if kind=='Expenses': return ('Date','Description','PKR'),self.rows('SELECT date,description,amount FROM expenses WHERE substr(date,1,10) BETWEEN ? AND ?',(start,end))
         if kind=='Cash closing': return ('Day','Expected PKR','Counted PKR','Variance PKR','Note','Actor'),self.rows('SELECT day,expected_cents/100.0,counted_cents/100.0,(counted_cents-expected_cents)/100.0,note,actor FROM daily_closings WHERE day BETWEEN ? AND ?',(start,end))
@@ -374,6 +418,8 @@ class Retail:
             content='<h2>Optical job slip</h2>'+''.join(f'<p><b>{label}:</b> {esc(v)}</p>' for label,v in zip(('Job','Customer','Instructions','Status','Promised date','Invoice','Prescription'),job))
         if kind!='Invoice':
             content=f'<!doctype html><meta charset="utf-8"><title>{esc(kind)}</title><style>body{{font:16px Segoe UI;margin:32px;color:#17263d}}td,th{{padding:12px;border:1px solid #ccc}}table{{border-collapse:collapse}}@media print{{button{{display:none}}}}</style><h1>{esc(settings.get("shop_name","AINAK MAHAL"))}</h1>'+content+'<button onclick="print()">Print</button>'
+        from brand import print_mark
+        content=content.replace('<h1>',print_mark()+'<h1>',1)
         if settings.get('receipt_format')=='80 mm' and kind=='Invoice': content=content.replace('</style>','body{max-width:72mm;margin:4mm;font-size:11px}td,th{padding:3px}@page{size:80mm auto;margin:4mm}</style>')
         directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
         path=directory/f'{kind.lower()}_{identifier}.html';path.write_text(content,encoding='utf-8');return path
