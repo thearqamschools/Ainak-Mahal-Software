@@ -44,3 +44,10 @@ jobs:
             test-results/screenshots/*.png
           if-no-files-found: error
           retention-days: 30
+      - name: Retain test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: AinakMahal-Test-Diagnostics
+          path: test-results/*.log
+          if-no-files-found: ignore
