@@ -2,28 +2,38 @@ name: Build Windows installer
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, 'feature/**']
+  pull_request:
+permissions:
+  contents: read
 jobs:
   windows-installer:
     runs-on: windows-latest
-    permissions:
-      contents: read
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7.0.1
         with:
-          python-version: '3.11'
-      - name: Run automated tests
-        run: python -m unittest discover -q
-      - name: Install packager
-        run: python -m pip install pyinstaller
-      - name: Build executable
-        run: pyinstaller --noconfirm --clean --onedir --windowed --name AinakMahal launcher.py
-      - name: Build installer
+          persist-credentials: false
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: '3.14'
+          architecture: x64
+      - name: Test and build offline installer
         shell: pwsh
-        run: '& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "installer\AinakMahal.iss"'
-      - uses: actions/upload-artifact@v4
+        run: ./tools/build.ps1
+      - name: Smoke test installed app and upgrade
+        shell: pwsh
+        run: ./tools/installer-smoke.ps1
+      - name: Record checksum
+        shell: pwsh
+        run: Get-FileHash output/AinakMahal_Setup.exe -Algorithm SHA256 | Format-List | Out-File output/SHA256.txt
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: AinakMahal-Windows-Installer
-          path: output/AinakMahal_Setup.exe
+          path: |
+            output/AinakMahal_Setup.exe
+            output/SHA256.txt
+            output/release-metadata.json
+            test-results/installed-smoke.json
           if-no-files-found: error
+          retention-days: 30
