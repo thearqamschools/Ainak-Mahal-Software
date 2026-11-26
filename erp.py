@@ -193,7 +193,10 @@ class ERP(Retail):
         import base64
         logo=Path(__file__).resolve().parent/'assets'/'brand'/'logo-light.png'
         if logo.exists():
-            image='<img width="290" height="63" alt="Ainak Mahal" src="data:image/png;base64,'+base64.b64encode(logo.read_bytes()).decode('ascii')+'">'
+            narrow=self.settings().get('receipt_format')=='80 mm' and kind in ('Invoice','Job')
+            # 80 mm paper has about 200 pt of printable width; a 290 px logo would be cut off.
+            size='width="170" height="37"' if narrow else 'width="290" height="63"'
+            image='<img '+size+' alt="Ainak Mahal" src="data:image/png;base64,'+base64.b64encode(logo.read_bytes()).decode('ascii')+'">'
             content=content.replace('<h1>',image+'<h1>',1)
         if kind=='Job':
             spec=self.db.execute('SELECT kind,fulfillment FROM job_specs WHERE job_id=?',(identifier,)).fetchone()

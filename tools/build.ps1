@@ -18,7 +18,7 @@ try {
     $pythonFolder=Split-Path (& $Python -c 'import sys; print(sys.executable)')
     $env:PATH=[Environment]::SystemDirectory+';'+$env:SystemRoot+';'+$pythonFolder
     $env:PYINSTALLER_CONFIG_DIR=Join-Path (Get-Location) 'build/packager-cache'
-    & $Python -m PyInstaller --noconfirm --clean --onedir --windowed --name AinakMahal --icon assets/brand/ainak-mahal.ico --version-file build/windows-version.txt --add-data 'docs;docs' --add-data 'assets;assets' --hidden-import recovery --hidden-import access_recovery --hidden-import access_recovery_ui --hidden-import qt_smoke --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets --exclude-module PySide6.QtQml --exclude-module PySide6.QtQuick --exclude-module PySide6.QtPdf --exclude-module PIL --exclude-module resvg_py --exclude-module imageio_ffmpeg qt_launcher.py
+    & $Python -m PyInstaller --noconfirm --clean --onedir --windowed --name AinakMahal --icon assets/brand/ainak-mahal.ico --version-file build/windows-version.txt --add-data 'docs;docs' --add-data 'assets;assets' --hidden-import recovery --hidden-import access_recovery --hidden-import access_recovery_ui --hidden-import hardware --hidden-import hardware_ui --hidden-import qt_smoke --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets --exclude-module PySide6.QtQml --exclude-module PySide6.QtQuick --exclude-module PySide6.QtPdf --exclude-module PIL --exclude-module resvg_py --exclude-module imageio_ffmpeg qt_launcher.py
     if ($LASTEXITCODE) { throw 'Executable build failed' }
     & $Python tools/validate_bundle.py
     if ($LASTEXITCODE) { throw 'Packaged DLL ABI validation failed' }

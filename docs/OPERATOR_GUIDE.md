@@ -97,8 +97,38 @@ consume stock. Opening stock and every adjustment create a traceable movement. S
 Edit item for price/contact-label changes; historical sale costs remain saved. Adjust stock
 requires an administrator and a reason, and cannot make stock negative. Stock history
 explains each change. Lens matrix groups optical lens/contact-lens powers and variants.
-Print label renders a local Code 128 from the assigned ASCII barcode or SKU. Test label
-size, printer resolution and scan readability with real hardware before shop rollout.
+Print label shows a preview of the real label, then prints the number of copies you choose.
+The barcode is the product's barcode, or its SKU when it has none (English letters, numbers
+and symbols only). Choose your label roll size once in Settings & Staff → Edit shop settings
+→ Barcode label size (50 × 25, 38 × 25, 60 × 40 or 80 × 60 mm). If a code is too long for a
+small label, the app says so instead of printing bars a scanner cannot read.
+
+## Printer and barcode scanner check
+
+Do this once on the shop computer after installing, and again after changing a printer,
+label roll or scanner. Nothing is sold and no stock changes.
+
+1. Install the printer drivers in Windows first (Settings → Printers & scanners) and print a
+   Windows test page.
+2. In Ainak Mahal: Settings & Staff → Edit shop settings. Pick the Preferred local printer
+   from the list, choose Receipt format (A4 or 80 mm) and Barcode label size. Save.
+3. Settings & Staff → Printer & scanner check. Choose the printer and press:
+   - **Print A4 test page**: every long ruler mark should measure exactly 10 mm.
+   - **Print 80 mm test receipt**: all four sides of the box must be on the paper.
+   - **Print test label**: the label must not be cut off or printed across two labels.
+   In the Windows print window, set the paper to the size you are testing, and set scaling
+   to 100% / Actual size (not Fit to page).
+4. Click the Scan here box and scan the barcode printed on the test page or label. The
+   result should say **PASS**. If it says the scanner sends Tab, or letters come out in the
+   wrong case, the message tells you what to change in the scanner setup.
+5. Open New Sale, scan a real product and check the right item is added.
+6. Tick what worked, type the printer and scanner models, and press Save check result. The
+   result is kept in the audit trail. Anything not ticked is listed as still to do.
+
+Scanners must work as a USB keyboard and send **Enter** after each code (most do by default).
+A scan adds the product whose barcode or SKU matches exactly; a partial code never adds a
+different product. If the saved printer is unplugged or renamed, Ainak Mahal warns you and lets
+you choose another printer instead of failing silently.
 
 ## Optical jobs and repairs
 
@@ -223,4 +253,4 @@ The installer is unsigned unless a trusted signing certificate is provided. The 
 build is for review; complete real-device and operator acceptance before daily trading.
 
 
-Developed by **Ahsan Iftikhar**. Current release: **2.0.2**.
+Developed by **Ahsan Iftikhar**. Current release: **2.0.3**.
