@@ -320,7 +320,7 @@ class Window(QMainWindow):
         bar=self.bar();self.button(bar,'Update status',update);self.button(bar,'Print / PDF job receipt',lambda:self.print_doc('Job',t.selected()[0]));self.button(bar,'Receive job payment',lambda:self.receive_payment(t.selected()[6]))
     def purchasing(self):
         self.s.authorize(True);bar=self.bar();self.button(bar,'Add supplier',lambda:self.form('Supplier',[('name','Supplier name *'),('phone','Mobile')],lambda v:self.s.supplier(v['name'],v['phone'])));self.button(bar,'New purchase order',lambda:self.purchase_dialog(False),True);self.button(bar,'Receive without PO',lambda:self.purchase_dialog(True));bar.addStretch()
-        tabs=Tabs();self.body.addWidget(tabs,1);orders=Table(('PO','Supplier','Created','Status'),self.s.purchase_orders());receipts=Table(('Receipt','Supplier','Date','Total PKR','Paid PKR','Due PKR','Opening status'),self.s.purchases());suppliers=Table(('ID','Supplier','Phone','Purchased PKR','Paid PKR','Confirmed due PKR','Unverified'),self.s.supplier_balances());tabs.addTab(orders,'Purchase orders');tabs.addTab(receipts,'Receipts & payments');tabs.addTab(suppliers,'Supplier profiles');bar=self.bar()
+        tabs=Tabs();self.body.addWidget(tabs,1);orders=Table(('PO','Supplier','Created','Status'),self.s.purchase_orders());receipts=Table(('Receipt','Supplier','Date','Total PKR','Paid PKR','Due PKR','Opening status'),self.s.purchases());suppliers=Table(('ID','Supplier','Phone','Purchased PKR','Paid PKR','Confirmed due PKR','Unverified','Unverified PKR'),self.s.supplier_balances());tabs.addTab(orders,'Purchase orders');tabs.addTab(receipts,'Receipts & payments');tabs.addTab(suppliers,'Supplier profiles');bar=self.bar()
         def receive():
             r=orders.selected()
             if QMessageBox.question(self,'Receive order',f'Receive all lines on PO #{r[0]}? Confirm delivered quantities first.')==QMessageBox.Yes:self.s.receive_po(r[0]);self.refresh()
@@ -332,7 +332,19 @@ class Window(QMainWindow):
         self.button(bar,'Record supplier payment',pay)
         def opening():
             r=receipts.selected();self.form('Confirm legacy supplier opening',[('balance','Verified unpaid balance PKR')],lambda v:self.s.confirm_supplier_opening(r[0],v['balance']),'Check the supplier statement. Historical paid amounts are opening adjustments, not new cash payments.')
-        self.button(bar,'Confirm legacy opening',opening);self.button(bar,'Supplier history',lambda:self.viewer('Supplier purchase history',('Receipt','Date','Total PKR'),self.s.rows('SELECT id,date,total FROM purchases WHERE supplier_id=? ORDER BY id DESC',(suppliers.selected()[0],))))
+        self.button(bar,'Reconcile supplier statement',self.supplier_statement,True);self.button(bar,'Confirm one legacy receipt',opening);self.button(bar,'Supplier history',lambda:self.viewer('Supplier purchase history',('Receipt','Date','Total PKR'),self.s.rows('SELECT id,date,total FROM purchases WHERE supplier_id=? ORDER BY id DESC',(suppliers.selected()[0],))))
+    def supplier_statement(self):
+        import supplier_openings
+        todo={f'{r[1]} · {r[3]} unverified receipt(s) · PKR {r[4]:,.2f}':r[0] for r in self.s.supplier_opening_worksheet()}
+        if not todo:QMessageBox.information(self,'Supplier statements','Every supplier receipt is already confirmed. Nothing to reconcile.');return
+        def save(v):
+            plan=self.s.supplier_statement_preview(v['supplier'],v['date'],v['balance'])
+            if QMessageBox.question(self,'Check before saving',supplier_openings.describe(plan)+'\n\nA verified backup is made first. Save these opening balances?')!=QMessageBox.Yes:
+                raise ValueError('Not saved. Change the details or press Cancel.')
+            result=self.s.confirm_supplier_statement(v['supplier'],v['date'],v['balance'],v['reference'],v['note'])
+            QMessageBox.information(self,'Supplier opening confirmed',f'{result["supplier"]}: {len(result["receipts"])} receipt(s) confirmed from {result["reference"]}.\nUnpaid now: PKR {result["legacy_unpaid_cents"]/100:,.2f} on legacy receipts.\n\nBackup made before the change:\n{result["backup"]}')
+        self.form('Reconcile supplier statement',[('supplier','Supplier *',todo),('date','Statement date (YYYY-MM-DD) *',None,date.today().isoformat()),('balance','Balance the shop owes on the statement, PKR *'),('reference','Statement number / reference *'),('note','Note · optional')],save,
+                  'Use the supplier\'s own written statement or ledger. Enter the total the statement says the shop owes on that date. Ainak Mahal subtracts what it already knows is unpaid and spreads the rest over the old receipts. No cash or bank payment is recorded.')
     def purchase_dialog(self,direct=False):
         self.s.authorize(True);suppliers={f'{r[1]} · #{r[0]}':r[0] for r in self.s.suppliers()};products=self.product_choices()
         if not suppliers or not products:raise ValueError('Add a supplier and products before creating a purchase')
@@ -378,7 +390,7 @@ class Window(QMainWindow):
         self.button(bar,'Close day',lambda:self.form('Daily cash closing',[('day','Closing day',None,today),('counted','Cash counted PKR'),('note','Count notes')],lambda v:self.s.close_day(v['day'],v['counted'],v['note']),'Count after all trading. Closing saves an immutable snapshot; later transactions do not alter it.'))
         tabs=Tabs();self.body.addWidget(tabs,1);tabs.addTab(Table(('Date','Description','PKR'),self.s.rows('SELECT date,description,amount FROM expenses ORDER BY id DESC')),'Expenses');tabs.addTab(Table(('Day','Movement','PKR','Reason','Staff'),self.s.rows('SELECT day,kind,amount_cents/100.0,note,actor FROM cash_movements ORDER BY created_at DESC')),'Cash movements');cols,rows=self.s.report('Cash closing','2000-01-01','2099-12-31');tabs.addTab(Table(cols,rows),'Closing history')
     def reports(self):
-        bar=self.bar();self.report_kind=combo(('Sales','Collections','Customer dues','Stock','Inventory valuation','Low stock','Purchases','Supplier balances','Supplier payments','Expenses','Cash closing','Profit'));self.report_start=QLineEdit(date.today().replace(day=1).isoformat());self.report_end=QLineEdit(date.today().isoformat());self.report_start.setMaximumWidth(140);self.report_end.setMaximumWidth(140)
+        bar=self.bar();self.report_kind=combo(('Sales','Collections','Customer dues','Stock','Inventory valuation','Low stock','Purchases','Supplier balances','Supplier openings to confirm','Supplier statements','Supplier payments','Expenses','Cash closing','Profit'));self.report_start=QLineEdit(date.today().replace(day=1).isoformat());self.report_end=QLineEdit(date.today().isoformat());self.report_start.setMaximumWidth(140);self.report_end.setMaximumWidth(140)
         bar.addWidget(self.report_kind);bar.addWidget(label('From'));bar.addWidget(self.report_start);bar.addWidget(label('To'));bar.addWidget(self.report_end);self.button(bar,'Apply',self.run_report,True);self.report_table=Table(('Report',),[]);self.body.addWidget(self.report_table,1);bar=self.bar();self.button(bar,'Export CSV',lambda:self.export_table(self.report_table));self.button(bar,'Print / save PDF',self.print_report);self.body.addWidget(label('Stock, supplier and customer balances are current positions. Profit is an operational estimate; legacy costs may be unavailable.','muted'));self.run_report()
     def run_report(self):
         cols,rows=self.s.report(value(self.report_kind),self.report_start.text(),self.report_end.text());self.report_data=(cols,rows);self.report_table.columns=cols;self.report_table.setColumnCount(len(cols));self.report_table.setHorizontalHeaderLabels(cols);self.report_table.replace(rows);self.notice.setText(f'{len(rows)} report rows.')

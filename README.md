@@ -74,6 +74,6 @@ Windows/PDF engine. Installer is unsigned without a supplied trusted signing cer
 Complete hardware, accessibility and shop-operator acceptance before daily trading.
 
 
-Developed by **Ahsan Iftikhar**. Current release: **2.0.3**.
+Developed by **Ahsan Iftikhar**. Current release: **2.0.4**.
 
 Every build generates a unique UTC build ID and matching Windows FileVersion/ProductVersion for the app and installer. See `output/release-metadata.json`; the login, app footer and About screen display the release/build identity. `app_info.py` is the release-version source of truth.

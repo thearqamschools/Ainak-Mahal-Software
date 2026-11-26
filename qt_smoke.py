@@ -85,7 +85,10 @@ def run(app):
             check=hardware_ui.HardwareCheck(None,s4);check.show();app.processEvents();check.scan.setFocus();QTest.keyClicks(check.scan,hardware.TEST_CODE);QTest.keyClick(check.scan,Qt.Key_Return)
             assert 'PASS' in check.scan_result.toPlainText() and check.isVisible();check.close();s4.close()
             progress('printer and scanner check verified')
-            result={'passed':True,'pages':list(NAV),'workflows':['first-run UI','login','atomic optical order','Rx','barcode keyboard input','cart removal','repairs','delivery','purchasing','supplier payment','cash','reconciliation','PDF','backup','restore','access recovery','printer & scanner check','schema 2']}
+            s5=ERP(path);cleanup.callback(s5.close);s5.login('review-owner-2','recovered-password')
+            for kind in ('Supplier balances','Supplier openings to confirm','Supplier statements'):s5.report(kind,'2000-01-01',date.today().isoformat())
+            s5.close();progress('supplier opening reports verified')
+            result={'passed':True,'pages':list(NAV),'workflows':['first-run UI','login','atomic optical order','Rx','barcode keyboard input','cart removal','repairs','delivery','purchasing','supplier payment','cash','reconciliation','PDF','backup','restore','access recovery','printer & scanner check','supplier statement reports','schema 2']}
     except Exception:result['error']=traceback.format_exc();result['stage']=stage
     finally:
         if window:window.cart=[];window.close()
