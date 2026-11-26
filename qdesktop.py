@@ -53,6 +53,10 @@ def apply_theme(app):
     from PySide6.QtGui import QPalette
     app.setStyleSheet(STYLE);palette=app.palette();palette.setColor(QPalette.PlaceholderText,QColor(PLACEHOLDER));app.setPalette(palette)
 
+def breakable_path(path):
+    """A file path with places to wrap after each folder; a long Windows user name must not widen the page."""
+    return str(path).replace('\\','\\\u200b').replace('/','/\u200b')
+
 def label(text,kind=None):
     w=QLabel(str(text));w.setWordWrap(True)
     if kind:w.setObjectName(kind)
@@ -280,7 +284,7 @@ class Window(QMainWindow):
             if s.role!='admin' and i in (6,8,10,11):b.setEnabled(False);b.setToolTip('Administrator access required')
             if i in (3,7):nav.addSpacing(6)
         nav.addStretch();nav.addWidget(label('●  OFFLINE · LOCAL DATA'));nav.addWidget(label(f'{s.actor} / {s.role}'))
-        side=QVBoxLayout(sidebar);side.setContentsMargins(0,0,0,0);menu_area=scrolling(menu);menu_area.setObjectName('sidebar');menu_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff);side.addWidget(menu_area);sidebar.setFixedWidth(max(220,menu.sizeHint().width()+12));layout.addWidget(sidebar)
+        side=QVBoxLayout(sidebar);side.setContentsMargins(0,0,0,0);menu_area=scrolling(menu);menu_area.setObjectName('sidebar');menu_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff);side.addWidget(menu_area);sidebar.setFixedWidth(min(280,max(220,menu.sizeHint().width()+12)));layout.addWidget(sidebar)
         right=QWidget();right.setObjectName('canvas');content=vbox(right,24,14);layout.addWidget(right,1);top=QHBoxLayout();top.addWidget(label('AINAK MAHAL / WORKSPACE','eyebrow'));top.addStretch()
         self.search=QLineEdit();self.search.setPlaceholderText('Search workspace…  Ctrl+K');self.search.setMinimumWidth(180);self.search.returnPressed.connect(lambda:self.safe(self.global_search));top.addWidget(self.search);top.addWidget(action('Refresh',lambda:self.safe(self.refresh)));top.addWidget(label('Offline','badge'));content.addLayout(top)
         self.title=label('','heading');content.addWidget(self.title);self.subtitle=label('','muted');content.addWidget(self.subtitle);self.area=PageArea();content.addWidget(self.area,1);self.notice=label('All changes are saved on this computer.','muted')
@@ -358,7 +362,7 @@ class Window(QMainWindow):
             QMessageBox.information(self,'Optical calculation',f'Transposed: {s+c:+.2f} / {-c:+.2f} × {(a+90-1)%180+1}°\nSpherical equivalent: {s+c/2:+.2f} D')
         self.form('Optical calculations',[('sph','SPH *'),('cyl','CYL *'),('axis','AXIS *')],calc,'Mathematical conversion only. Verify measurements and use professional judgement.')
     def pos(self):
-        left=QWidget();ll=vbox(left);right=QWidget();rl=vbox(right);right.setMinimumWidth(300);self.body.addWidget(ResponsiveGrid((left,right),2,(3,2),20))
+        left=QWidget();ll=vbox(left);right=QWidget();rl=vbox(right);self.body.addWidget(ResponsiveGrid((left,right),2,(3,2),20))
         w,l=card('1  Customer & prescription');self.pos_customer=combo(self.customer_choices(True));self.pos_customer.setAccessibleName('Customer');l.addWidget(self.pos_customer)
         self.new_name=QLineEdit();self.new_name.setPlaceholderText('New customer name · optional');self.new_phone=QLineEdit();self.new_phone.setPlaceholderText('New customer mobile');nr=QHBoxLayout();nr.addWidget(self.new_name);nr.addWidget(self.new_phone);l.addLayout(nr)
         self.pos_rx=combo({'No prescription':None});self.pos_rx.setAccessibleName('Prescription');l.removeWidget(self.pos_customer);customer_row=QHBoxLayout();customer_row.addWidget(self.pos_customer,1);customer_row.addWidget(self.pos_rx,1);l.insertLayout(1,customer_row)
@@ -370,7 +374,7 @@ class Window(QMainWindow):
         def new_prescription():
             d=Form(self,'Prescription for this order',self.rx_fields(),lambda v:setattr(self,'draft_rx',v),'Saved with this order in the same transaction. Select or enter a customer first.')
             if d.exec():self.pos_rx.setCurrentIndex(0);self.rx_hint.setText('New prescription entered · pending checkout')
-        l.addWidget(action('Enter new prescription for this order',new_prescription));self.rx_hint=label('Optional for counter sales.','muted');l.addWidget(self.rx_hint);ll.addWidget(w)
+        l.addWidget(action('Add new prescription',new_prescription));self.rx_hint=label('Optional for counter sales.','muted');l.addWidget(self.rx_hint);ll.addWidget(w)
         w,l=card('2  Eyewear & services');self.scan=QLineEdit();self.scan.setPlaceholderText('Scan barcode or search name / SKU');self.scan.setAccessibleName('Product search or barcode');l.addWidget(self.scan)
         self.catalog=Table(('ID','SKU','Item','PKR','Available'),[(r[0],r[1],r[2],r[4],'Service' if r[9] else r[5]) for r in self.s.products()]);self.catalog.setMinimumHeight(100);self.catalog.setMaximumHeight(120);l.addWidget(self.catalog)
         self.scan.textChanged.connect(lambda term:self.catalog.replace([(r[0],r[1],r[2],r[4],'Service' if r[9] else r[5]) for r in self.s.products(term)]))
@@ -542,7 +546,7 @@ class Window(QMainWindow):
         t=self.table(('ID','Username','Role','Active'),self.s.users());self.button(self.bar(),'Enable / disable selected',lambda:(self.s.set_active(t.selected()[1],not t.selected()[3]),self.refresh()));self.body.addWidget(label('Audit trail · latest 200 events','section'));self.table(('Staff','Action','Reference','Date'),self.s.rows('SELECT actor,action,reference,created_at FROM audit_events ORDER BY id DESC LIMIT 200'))
     def about(self):self.document('About Ainak Mahal',f'<h1>Ainak Mahal Desktop ERP {VERSION}</h1><p><b>{DEVELOPER_CREDIT}</b></p><p>{DISPLAY_VERSION}</p><p>Millat Chowk, Faisalabad · Offline optical store management.</p><p>Data stays in your Windows profile. No subscription, telemetry or cloud account. Keep verified backups on another drive.</p><p>Original artwork and Qt Widgets UI. Qt/PySide6 are dynamically distributed under their applicable open-source licenses. See bundled license notices, source and replacement instructions.</p>')
     def backup(self):
-        self.s.authorize(True);w,l=card('Keep a verified copy, every day');l.addWidget(label(str(data_dir()/'ainak_mahal.db'),'muted'));l.addWidget(label('Backups contain customer details and password hashes. Keep a protected copy on another drive.'));row=QHBoxLayout();l.addLayout(row)
+        self.s.authorize(True);w,l=card('Keep a verified copy, every day');l.addWidget(label(breakable_path(data_dir()/'ainak_mahal.db'),'muted'));l.addWidget(label('Backups contain customer details and password hashes. Keep a protected copy on another drive.'));row=FlowBar();l.addLayout(row)
         def backup():
             directory=Path(self.s.settings().get('backup_destination',str(data_dir()/'backups')));directory.mkdir(parents=True,exist_ok=True)
             path,_=QFileDialog.getSaveFileName(self,'Save verified backup',str(directory/'ainak_mahal_backup.db'),'SQLite backup (*.db)')

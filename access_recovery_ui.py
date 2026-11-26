@@ -31,7 +31,8 @@ class AccessRecovery(QDialog):
                        'sales and payments are not touched.')
         intro.setWordWrap(True)
         layout.addWidget(intro)
-        where = QLabel(f'Shop data: {db_path}')
+        from qdesktop import breakable_path
+        where = QLabel(f'Shop data: {breakable_path(db_path)}')
         where.setTextInteractionFlags(Qt.TextSelectableByMouse)
         where.setWordWrap(True)
         layout.addWidget(where)
