@@ -102,6 +102,9 @@ class Retail:
           COALESCE(d.variant,''),COALESCE(d.reorder_level,2),COALESCE(d.is_service,0)
           FROM products p LEFT JOIN product_details d ON d.product_id=p.id
           WHERE p.name LIKE ? OR p.sku LIKE ? OR d.barcode LIKE ? OR d.variant LIKE ? ORDER BY p.name''',(term,term,term,term))
+    def find_code(self, code):
+        """Exact barcode/SKU match for scanner input; None when the code is unknown."""
+        self.authorize(); import hardware; return hardware.find_scanned(self.db,code)
     def product(self, sku,name,price,cost,qty,category,barcode='',variant='',sph='',cyl='',reorder=2,service=False):
         self.authorize(True)
         qty = int(qty)
@@ -312,8 +315,25 @@ class Retail:
         rate=Decimal(values.get('tax_rate','0'))
         if not rate.is_finite() or not 0<=rate<=100: raise ValueError('Tax rate must be between 0 and 100')
         if values.get('receipt_format','A4') not in ('A4','80 mm'): raise ValueError('Select A4 or 80 mm receipt format')
+        from hardware import LABEL_SIZES
+        if values.get('label_size','80 × 60 mm') not in LABEL_SIZES: raise ValueError('Select a label size from the list')
         with self.db:
             self.db.executemany('INSERT INTO app_settings VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',values.items()); self.audit('settings')
+    def save_hardware_check(self, data):
+        """Operator acceptance of the real printer/scanner, kept with the audit trail."""
+        self.authorize(True)
+        import json
+        record = dict(data, at=now(), by=self.actor)
+        with self.db:
+            self.db.execute('INSERT INTO app_settings VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',
+                            ('hardware_check_last', json.dumps(record, ensure_ascii=False)))
+            self.audit('hardware_check_' + record.get('result', 'INCOMPLETE').lower(), json.dumps(record, ensure_ascii=False)[:900])
+        return record
+    def hardware_check_last(self):
+        import json
+        raw = self.settings().get('hardware_check_last')
+        try: return json.loads(raw) if raw else None
+        except ValueError: return None
     def dashboard(self):
         self.authorize(); today=date.today().isoformat()
         return {
@@ -379,6 +399,6 @@ class Retail:
             content='<h2>Optical job slip</h2>'+''.join(f'<p><b>{label}:</b> {esc(v)}</p>' for label,v in zip(('Job','Customer','Instructions','Status','Promised date','Invoice','Prescription'),job))
         if kind!='Invoice':
             content=f'<!doctype html><meta charset="utf-8"><title>{esc(kind)}</title><style>body{{font:16px Segoe UI;margin:32px;color:#17263d}}td,th{{padding:12px;border:1px solid #ccc}}table{{border-collapse:collapse}}@media print{{button{{display:none}}}}</style><h1>{esc(settings.get("shop_name","AINAK MAHAL"))}</h1>'+content+'<button onclick="print()">Print</button>'
-        if settings.get('receipt_format')=='80 mm' and kind=='Invoice': content=content.replace('</style>','body{max-width:72mm;margin:4mm;font-size:11px}td,th{padding:3px}@page{size:80mm auto;margin:4mm}</style>')
+        if settings.get('receipt_format')=='80 mm' and kind in ('Invoice','Job'): content=content.replace('</style>','body{max-width:72mm;margin:4mm;font-size:11px}td,th{padding:3px}@page{size:80mm auto;margin:4mm}</style>')
         directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
         path=directory/f'{kind.lower()}_{identifier}.html';path.write_text(content,encoding='utf-8');return path

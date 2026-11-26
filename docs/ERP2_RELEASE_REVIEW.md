@@ -33,6 +33,10 @@ customer database was opened, overwritten or distributed during development.
 - [x] 2.0.2: offline administrator Access Recovery (username list, new password or replacement
   administrator) with verified pre-change backup, typed confirmation, instance lock, business-data
   fingerprint guard, post-change reconciliation and a notice/audit event on next admin sign-in.
+- [x] 2.0.3: Printer & scanner check (A4/80 mm test pages with rulers, test label, scanner speed/
+  suffix/case diagnosis, saved acceptance in audit); installed-printer picker with missing-printer
+  warning; dot-aligned Code 128 labels in 50×25/38×25/60×40/80×60 mm; exact barcode/SKU scan
+  matching; 80 mm job receipts and receipt-width logo. Physical-device acceptance still required.
 - [x] Additive schema 2 with pre-upgrade snapshot; legacy IDs, rows and storage path preserved.
 - [x] Offline runtime, no web view/server/cloud account, no subscription, no runtime telemetry.
 - [x] Updated operator/installation/design/reference/dependency documents and retained legacy UI.

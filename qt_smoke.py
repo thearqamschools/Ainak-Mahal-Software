@@ -75,7 +75,17 @@ def run(app):
             assert reset['backup'].is_file() and (reset['stock_mismatches'],reset['payment_mismatches'])==(0,0)
             s3=ERP(path);cleanup.callback(s3.close);assert s3.login('review-owner-2','recovered-password')=='admin' and len(s3.access_notices)==1;s3.close()
             progress('access recovery verified')
-            result={'passed':True,'pages':list(NAV),'workflows':['first-run UI','login','atomic optical order','Rx','barcode keyboard input','cart removal','repairs','delivery','purchasing','supplier payment','cash','reconciliation','PDF','backup','restore','access recovery','schema 2']}
+            import hardware,hardware_ui
+            s4=ERP(path);cleanup.callback(s4.close);s4.login('review-owner-2','recovered-password')
+            for size in hardware.LABEL_SIZES:
+                label_pdf=QPrinter(QPrinter.HighResolution);label_pdf.setOutputFormat(QPrinter.PdfFormat);label_pdf.setOutputFileName(str(Path(temp)/'label.pdf'))
+                hardware.print_label(label_pdf,{'label_size':size},'Smoke label',hardware.TEST_CODE,'PKR 0')
+            for kind in ('A4','80 mm'):
+                test_pdf=QPrinter(QPrinter.HighResolution);test_pdf.setOutputFormat(QPrinter.PdfFormat);test_pdf.setOutputFileName(str(Path(temp)/'test-page.pdf'));hardware.print_test_page(test_pdf,kind)
+            check=hardware_ui.HardwareCheck(None,s4);check.show();app.processEvents();check.scan.setFocus();QTest.keyClicks(check.scan,hardware.TEST_CODE);QTest.keyClick(check.scan,Qt.Key_Return)
+            assert 'PASS' in check.scan_result.toPlainText() and check.isVisible();check.close();s4.close()
+            progress('printer and scanner check verified')
+            result={'passed':True,'pages':list(NAV),'workflows':['first-run UI','login','atomic optical order','Rx','barcode keyboard input','cart removal','repairs','delivery','purchasing','supplier payment','cash','reconciliation','PDF','backup','restore','access recovery','printer & scanner check','schema 2']}
     except Exception:result['error']=traceback.format_exc();result['stage']=stage
     finally:
         if window:window.cart=[];window.close()

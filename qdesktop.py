@@ -7,6 +7,7 @@ from PySide6.QtGui import QIcon,QKeySequence,QShortcut,QPainter,QPen,QColor,QFon
 from PySide6.QtWidgets import *
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtPrintSupport import QPrinter,QPrintDialog
+from hardware import printer_choices,apply_printer,print_label,label_size,LABEL_SIZES,DEFAULT_LABEL,SYSTEM_DEFAULT,RECEIPT_KINDS
 from paths import data_dir
 from app_info import VERSION,DISPLAY_VERSION,DEVELOPER_CREDIT
 
@@ -242,7 +243,7 @@ class Window(QMainWindow):
         self.catalog=Table(('ID','SKU','Item','PKR','Available'),[(r[0],r[1],r[2],r[4],'Service' if r[9] else r[5]) for r in self.s.products()]);self.catalog.setMinimumHeight(100);self.catalog.setMaximumHeight(120);l.addWidget(self.catalog)
         self.scan.textChanged.connect(lambda term:self.catalog.replace([(r[0],r[1],r[2],r[4],'Service' if r[9] else r[5]) for r in self.s.products(term)]))
         row=QHBoxLayout();self.qty=QSpinBox();self.qty.setRange(1,10000);self.qty.setAccessibleName('Units');row.addWidget(label('Units'));row.addWidget(self.qty);self.button(row,'Add to order',self.add_cart,True);row.addStretch();l.addLayout(row)
-        self.scan.returnPressed.connect(lambda:self.safe(self.add_cart));self.catalog.itemDoubleClicked.connect(lambda *_:self.safe(self.add_cart));self.cart_table=Table(('ID','Item','Units','Unit PKR','Line PKR'));self.cart_table.setMinimumHeight(130);self.cart_table.setMaximumHeight(180);l.addWidget(self.cart_table);self.button(l,'Remove selected line',self.remove_cart);ll.addWidget(w)
+        self.scan.returnPressed.connect(lambda:self.safe(lambda:self.add_cart(True)));self.catalog.itemDoubleClicked.connect(lambda *_:self.safe(self.add_cart));self.cart_table=Table(('ID','Item','Units','Unit PKR','Line PKR'));self.cart_table.setMinimumHeight(130);self.cart_table.setMaximumHeight(180);l.addWidget(self.cart_table);self.button(l,'Remove selected line',self.remove_cart);ll.addWidget(w)
         w,l=card('3  Checkout');self.discount=QLineEdit(getattr(self,'draft_discount','0'));self.paid=QLineEdit(getattr(self,'draft_paid','0'));self.payment_method=combo(('Cash','Bank','Card'))
         for text,widget in (('Discount · PKR',self.discount),('Amount received · PKR',self.paid),('Payment method',self.payment_method)):l.addWidget(label(text,'muted'));l.addWidget(widget)
         self.total=label('','section');l.addWidget(self.total);self.discount.textChanged.connect(self.redraw_cart);self.paid.textChanged.connect(self.redraw_cart);self.button(l,'Save optical order   Ctrl+Enter',self.complete,True);l.addWidget(label('Enter money retained after giving change. A balance requires a named customer.','muted'));rl.addWidget(w)
@@ -257,9 +258,14 @@ class Window(QMainWindow):
             else:widget.setText(str(val))
         if self.draft_rx:self.rx_hint.setText('New prescription entered · pending checkout')
         self.redraw_cart();self.scan.setFocus()
-    def add_cart(self):
-        if self.catalog.rowCount()==1:self.catalog.selectRow(0)
-        pid=self.catalog.selected()[0];candidate=self.cart+[(pid,self.qty.value())];self.s.quote(candidate,self.discount.text() or 0);grouped={}
+    def add_cart(self,scanned=False):
+        exact=self.s.find_code(self.scan.text()) if scanned else None
+        if exact is not None:pid=exact
+        else:
+            if self.catalog.rowCount()==1:self.catalog.selectRow(0)
+            elif self.scan.text().strip() and self.catalog.currentRow()<0:raise ValueError(f'No product has the barcode or SKU "{self.scan.text().strip()}". Check the code or choose the item from the list.')
+            pid=self.catalog.selected()[0]
+        candidate=self.cart+[(pid,self.qty.value())];self.s.quote(candidate,self.discount.text() or 0);grouped={}
         for p,q in candidate:grouped[p]=grouped.get(p,0)+q
         self.cart=list(grouped.items());self.scan.clear();self.redraw_cart();self.scan.setFocus()
     def remove_cart(self):
@@ -293,9 +299,11 @@ class Window(QMainWindow):
     def stock_history(self,r):self.viewer('Stock history · '+r[2],('Units','Reason','Reference','Date'),self.s.rows('SELECT delta,reason,reference_id,created_at FROM stock_movements WHERE product_id=? ORDER BY created_at DESC',(r[0],)))
     def lens_matrix(self):self.viewer('Lens power inventory',('Category','SPH','CYL','Variant','Units'),self.s.rows("SELECT p.category,d.sph,d.cyl,d.variant,SUM(p.qty) FROM product_details d JOIN products p ON p.id=d.product_id WHERE p.category IN ('Lenses','Contact lenses') GROUP BY p.category,d.sph,d.cyl,d.variant ORDER BY p.category,CAST(d.sph AS REAL),CAST(d.cyl AS REAL)"))
     def product_label(self,r):
-        from labels import barcode_png
-        path=barcode_png(r[6] or r[1],data_dir()/'documents'/f'barcode_{r[0]}.png')
-        self.document('Product label',f'<h2>{html.escape(r[2])}</h2><p>SKU {html.escape(r[1])}</p><img src="{path.as_uri()}" width="300" height="90"><p>{html.escape(r[6] or r[1])} · PKR {r[4]:,.2f}</p>')
+        from hardware_ui import LabelDialog
+        LabelDialog(self,self.s,r[2],r[6] or r[1],f'PKR {r[4]:,.0f}').exec()
+    def hardware_check(self):
+        from hardware_ui import HardwareCheck
+        self.s.authorize(True);HardwareCheck(self,self.s).exec();self.refresh()
     def viewer(self,title,cols,rows):
         d=QDialog(self);d.setWindowTitle(title);d.resize(1000,650);l=vbox(d,24);l.addWidget(label(title,'section'));t=Table(cols,rows);l.addWidget(t,1);bar=QHBoxLayout();bar.addWidget(action('Export CSV',lambda:self.safe(lambda:self.export_table(t))));bar.addWidget(action('Close',d.accept));l.addLayout(bar);d.exec()
     def new_job(self):
@@ -384,9 +392,9 @@ class Window(QMainWindow):
     def settings(self):
         self.s.authorize(True);settings=self.s.settings();bar=self.bar()
         def shop():
-            fields=[('shop_name','Shop name',None,settings.get('shop_name','AINAK MAHAL')),('address','Address',None,settings.get('address','Millat Chowk, Faisalabad')),('phone','Mobile',None,settings.get('phone','')),('tax_rate','Tax rate %',None,settings.get('tax_rate','0')),('receipt_format','Receipt format',('A4','80 mm'),settings.get('receipt_format','A4')),('printer','Preferred local printer',None,settings.get('printer','System default')),('backup_destination','Backup folder',None,settings.get('backup_destination',str(data_dir()/'backups')))]
+            fields=[('shop_name','Shop name',None,settings.get('shop_name','AINAK MAHAL')),('address','Address',None,settings.get('address','Millat Chowk, Faisalabad')),('phone','Mobile',None,settings.get('phone','')),('tax_rate','Tax rate %',None,settings.get('tax_rate','0')),('receipt_format','Receipt format',('A4','80 mm'),settings.get('receipt_format','A4')),('printer','Preferred local printer',printer_choices(settings.get('printer','')),settings.get('printer',SYSTEM_DEFAULT)),('label_size','Barcode label size',tuple(LABEL_SIZES),settings.get('label_size',DEFAULT_LABEL)),('backup_destination','Backup folder',None,settings.get('backup_destination',str(data_dir()/'backups')))]
             self.form('Shop settings',fields,self.s.save_settings)
-        self.button(bar,'Edit shop settings',shop,True);self.button(bar,'Add staff account',lambda:self.form('Staff account',[('username','Username *'),('password','Password (10+ characters) *','password'),('role','Role',('cashier','admin'))],lambda v:self.s.create_user(v['username'],v['password'],v['role'])));self.button(bar,'About & offline data',self.about)
+        self.button(bar,'Edit shop settings',shop,True);self.button(bar,'Add staff account',lambda:self.form('Staff account',[('username','Username *'),('password','Password (10+ characters) *','password'),('role','Role',('cashier','admin'))],lambda v:self.s.create_user(v['username'],v['password'],v['role'])));self.button(bar,'Printer & scanner check',self.hardware_check);self.button(bar,'About & offline data',self.about)
         t=self.table(('ID','Username','Role','Active'),self.s.users());self.button(self.bar(),'Enable / disable selected',lambda:(self.s.set_active(t.selected()[1],not t.selected()[3]),self.refresh()));self.body.addWidget(label('Audit trail · latest 200 events','section'));self.table(('Staff','Action','Reference','Date'),self.s.rows('SELECT actor,action,reference,created_at FROM audit_events ORDER BY id DESC LIMIT 200'))
     def about(self):self.document('About Ainak Mahal',f'<h1>Ainak Mahal Desktop ERP {VERSION}</h1><p><b>{DEVELOPER_CREDIT}</b></p><p>{DISPLAY_VERSION}</p><p>Millat Chowk, Faisalabad · Offline optical store management.</p><p>Data stays in your Windows profile. No subscription, telemetry or cloud account. Keep verified backups on another drive.</p><p>Original artwork and Qt Widgets UI. Qt/PySide6 are dynamically distributed under their applicable open-source licenses. See bundled license notices, source and replacement instructions.</p>')
     def backup(self):
@@ -411,12 +419,11 @@ class Window(QMainWindow):
     def document(self,title,content):
         d=QDialog(self);d.setWindowTitle(title);d.resize(900,760);l=vbox(d,24);view=QTextBrowser();view.setOpenExternalLinks(False);view.setHtml(content);l.addWidget(view,1);bar=QHBoxLayout();l.addLayout(bar)
         def printer(pdf=False):
-            p=QPrinter(QPrinter.HighResolution);preferred=self.s.settings().get('printer','')
-            if title=='Invoice' and self.s.settings().get('receipt_format')=='80 mm':
+            p=QPrinter(QPrinter.HighResolution);settings=self.s.settings()
+            if title in RECEIPT_KINDS and settings.get('receipt_format')=='80 mm':
                 p.setPageSize(QPageSize(QSizeF(80,240),QPageSize.Millimeter));p.setPageMargins(QMarginsF(4,4,4,4),QPageLayout.Millimeter)
-            elif title=='Product label':
-                p.setPageSize(QPageSize(QSizeF(80,60),QPageSize.Millimeter));p.setPageMargins(QMarginsF(3,3,3,3),QPageLayout.Millimeter)
-            if preferred and preferred!='System default':p.setPrinterName(preferred)
+            warning='' if pdf else apply_printer(p,settings.get('printer',''))
+            if warning:QMessageBox.warning(d,'Printer not found',warning)
             if pdf:
                 path,_=QFileDialog.getSaveFileName(d,'Save PDF',title.lower().replace(' ','_')+'.pdf','PDF document (*.pdf)')
                 if not path:return
