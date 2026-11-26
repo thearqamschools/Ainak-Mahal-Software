@@ -1,9 +1,9 @@
 #define MyAppName "Ainak Mahal"
 #ifndef MyAppVersion
-#define MyAppVersion "2.0.1"
+#define MyAppVersion "2.0.2"
 #endif
 #ifndef MyFileVersion
-#define MyFileVersion "2.0.1.0"
+#define MyFileVersion "2.0.2.0"
 #endif
 #ifndef MyBuildId
 #define MyBuildId "manual"
@@ -39,6 +39,7 @@ Source: "..\dist\AinakMahal\*"; DestDir: "{app}"; Flags: ignoreversion recursesu
 [Icons]
 Name: "{autoprograms}\Ainak Mahal"; Filename: "{app}\{#MyAppExeName}"; Check: not IsSmokeTest
 Name: "{autoprograms}\Ainak Mahal Recovery"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--restore"; Check: not IsSmokeTest
+Name: "{autoprograms}\Ainak Mahal Access Recovery"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--reset-access"; Check: not IsSmokeTest
 Name: "{autoprograms}\Ainak Mahal Operator Guide"; Filename: "{app}\_internal\docs\OPERATOR_GUIDE.html"; Check: not IsSmokeTest
 Name: "{autodesktop}\Ainak Mahal"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon; Check: not IsSmokeTest
 [Tasks]

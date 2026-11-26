@@ -23,7 +23,8 @@ The sidebar covers live dashboard, integrated customer/Rx/cart/payment/optical-j
 customer profiles/history, printable prescriptions, frame/lens/contact-lens inventory,
 Code 128 labels, optical jobs/repairs with charges, supplier PO/receipt/payment ledger,
 customer dues/returns/store credit, cash/expenses/closing, reports/PDF/CSV, staff/audit and
-verified backup/recovery. F2 checkout, F3 customers, Ctrl+K search, Ctrl+Enter save order.
+verified backup/recovery. Start → Ainak Mahal Access Recovery (`--reset-access`) restores a lost
+administrator sign-in after a verified backup, without touching business data. F2 checkout, F3 customers, Ctrl+K search, Ctrl+Enter save order.
 Original navy/teal eyeglasses identity is included as SVG, PNG and multi-size ICO.
 
 ## Build and verify on Windows
@@ -73,6 +74,6 @@ Windows/PDF engine. Installer is unsigned without a supplied trusted signing cer
 Complete hardware, accessibility and shop-operator acceptance before daily trading.
 
 
-Developed by **Ahsan Iftikhar**. Current release: **2.0.1**.
+Developed by **Ahsan Iftikhar**. Current release: **2.0.2**.
 
 Every build generates a unique UTC build ID and matching Windows FileVersion/ProductVersion for the app and installer. See `output/release-metadata.json`; the login, app footer and About screen display the release/build identity. `app_info.py` is the release-version source of truth.

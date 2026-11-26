@@ -30,6 +30,9 @@ customer database was opened, overwritten or distributed during development.
 - [x] Sales/collections/dues/stock/valuation/low-stock/purchases/supplier balances/payments/
   expenses/closing/profit reports, date filters, CSV export, native print and PDF output.
 - [x] Staff roles/account activation, audit trail, verified backups and authenticated recovery.
+- [x] 2.0.2: offline administrator Access Recovery (username list, new password or replacement
+  administrator) with verified pre-change backup, typed confirmation, instance lock, business-data
+  fingerprint guard, post-change reconciliation and a notice/audit event on next admin sign-in.
 - [x] Additive schema 2 with pre-upgrade snapshot; legacy IDs, rows and storage path preserved.
 - [x] Offline runtime, no web view/server/cloud account, no subscription, no runtime telemetry.
 - [x] Updated operator/installation/design/reference/dependency documents and retained legacy UI.
