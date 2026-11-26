@@ -24,13 +24,15 @@ SCREENS = {
 class ScreenFitTests(unittest.TestCase):
     def test_every_screen_fits_and_every_input_is_named(self):
         with tempfile.TemporaryDirectory() as tmp:
-            for name, (w, h, dpr) in SCREENS.items():
-                with self.subTest(screen=name):
+            # Second pass: text 30% larger in a wide font, so pages must adapt rather than fit by luck.
+            stress = {'AINAK_AUDIT_FONT': 'DejaVu Sans', 'AINAK_AUDIT_EXTRA_STYLE': 'QWidget{font-size:13pt;}'}
+            for (name, (w, h, dpr)), extra in [(item, {}) for item in SCREENS.items()] + [(item, stress) for item in SCREENS.items()]:
+                with self.subTest(screen=name, large_text=bool(extra)):
                     config = Path(tmp) / 'screen.json'
                     config.write_text(json.dumps({'screens': [{'name': 's', 'x': 0, 'y': 0, 'width': w, 'height': h,
                                                                'logicalDpi': 96, 'logicalBaseDpi': 96, 'dpr': dpr}]}))
                     # Relative path: a Windows drive letter ("C:") would be read as an option separator.
-                    env = dict(os.environ, QT_QPA_PLATFORM='offscreen:configfile=screen.json')
+                    env = dict(os.environ, QT_QPA_PLATFORM='offscreen:configfile=screen.json', **extra)
                     run = subprocess.run([sys.executable, str(ROOT / 'tools' / 'screen_audit.py')], env=env,
                                          capture_output=True, text=True, timeout=300, cwd=tmp)
                     self.assertEqual(run.returncode, 0, run.stderr[-2000:])

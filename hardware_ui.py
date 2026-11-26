@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt, QEvent, QSize
 from PySide6.QtGui import QImage, QPixmap, QColor
 from PySide6.QtPrintSupport import QPrinter, QPrintDialog
 from PySide6.QtWidgets import (QDialog, QLabel, QLineEdit, QComboBox, QPushButton, QSpinBox, QCheckBox,
-                               QHBoxLayout, QVBoxLayout, QMessageBox, QFileDialog, QGroupBox, QPlainTextEdit, QWidget)
+                               QHBoxLayout, QVBoxLayout, QMessageBox, QFileDialog, QGroupBox, QPlainTextEdit, QWidget, QSizePolicy)
 import hardware as hw
 
 
@@ -58,6 +58,7 @@ class LabelDialog(QDialog):
         self.copies = QSpinBox()
         self.copies.setRange(1, 500)
         self.copies.setAccessibleName('Number of labels')
+        self.copies.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)   # grow with large text instead of clipping
         row.addWidget(self.copies)
         row.addStretch()
         for text, pdf in (('Print labels', False), ('Save PDF', True)):
@@ -70,6 +71,12 @@ class LabelDialog(QDialog):
         layout.addLayout(row)
         for button in self.findChildren(QPushButton):
             button.setAutoDefault(False)
+
+    def showEvent(self, event):
+        # Styles are applied on first show; re-measure so large text is never clipped.
+        super().showEvent(event)
+        self.copies.setMinimumHeight(self.copies.minimumSizeHint().height())
+        self.adjustSize()
 
     def run(self, pdf):
         try:

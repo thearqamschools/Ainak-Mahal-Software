@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from PySide6.QtWidgets import (QApplication, QPushButton, QLineEdit, QComboBox, QSpinBox, QTableWidget, QCheckBox,
                                QScrollArea, QAbstractButton, QFormLayout, QWidget, QDialog, QPlainTextEdit, QTextBrowser)
-from PySide6.QtCore import QPoint
+from PySide6.QtCore import QPoint, Qt
 
 FRAME = 32          # Windows title bar at 100-150% in logical pixels (approx.)
 INPUTS = (QLineEdit, QComboBox, QSpinBox, QTableWidget, QCheckBox, QPlainTextEdit)
@@ -29,6 +29,31 @@ def problems_in(top, name, area):
     for b in top.findChildren(QAbstractButton):
         if b.isVisibleTo(top) and b.text() and b.width() + 1 < b.minimumSizeHint().width():
             out.append(f'{name}: button "{b.text()}" is cut off')
+    return out
+
+
+def squashed(top, name):
+    """Controls drawn smaller than they need: text or content would be hidden."""
+    out = []
+    for w in top.findChildren(QWidget):
+        if not w.isVisibleTo(top) or w.width() <= 0:
+            continue
+        need = w.minimumSizeHint()
+        # Wrapped text needs a height that depends on the width actually given.
+        need_h = w.heightForWidth(w.width()) if w.hasHeightForWidth() and w.heightForWidth(w.width()) > 0 else need.height()
+        if isinstance(w, (QAbstractButton, QLineEdit, QComboBox, QSpinBox)) or w.objectName() == 'card':
+            if w.height() + 3 < need_h:   # a 1-2 px difference is the stylesheet's fixed input height
+                label = getattr(w, 'text', lambda: '')() if isinstance(w, QAbstractButton) else (w.accessibleName() or w.objectName())
+                out.append(f'{name}: {type(w).__name__} "{label}" squashed to {w.height()}px high, needs {need_h}px')
+        # inside a scroll area that never scrolls sideways, nothing may stick out on the right
+        parent = w.parentWidget()
+        while parent is not None and parent is not top and not isinstance(parent, QScrollArea):
+            parent = parent.parentWidget()
+        if isinstance(parent, QScrollArea) and not isinstance(parent, (QTableWidget, QPlainTextEdit, QTextBrowser)) \
+                and parent.horizontalScrollBarPolicy() == Qt.ScrollBarAlwaysOff and isinstance(w, QAbstractButton):
+            right = w.mapTo(parent.viewport(), QPoint(w.width(), 0)).x()
+            if right > parent.viewport().width() + 1:
+                out.append(f'{name}: "{w.text()}" is cut off on the right')
     return out
 
 
@@ -71,8 +96,12 @@ def unnamed(top, name):
 
 def run():
     app = QApplication.instance() or QApplication([])
+    substitute = os.environ.get('AINAK_AUDIT_FONT')   # test with a wider font than Segoe UI where Segoe is not installed
+    if substitute:
+        from PySide6.QtGui import QFont
+        QFont.insertSubstitution('Segoe UI', substitute)
     from qdesktop import Window, Login, Form, STYLE, NAV
-    app.setStyleSheet(STYLE)
+    app.setStyleSheet(STYLE + os.environ.get('AINAK_AUDIT_EXTRA_STYLE', ''))   # e.g. larger text to stress-test layouts
     from erp import ERP
     from hardware_ui import HardwareCheck, LabelDialog
     from access_recovery_ui import AccessRecovery
@@ -81,8 +110,8 @@ def run():
     report = {'screen': [area.width(), area.height(), screen.devicePixelRatio()], 'problems': [], 'unnamed': []}
     tmp = tempfile.mkdtemp()
     s = ERP(Path(tmp) / 'ainak_mahal.db')
-    login = Login(s, lambda: None); login.show(); app.processEvents()
-    report['problems'] += problems_in(login, 'Sign-in (first run)', area) + unreachable(login, 'Sign-in')
+    login = Login(s, lambda: None); login.show(); app.processEvents(); app.processEvents()
+    report['problems'] += problems_in(login, 'Sign-in (first run)', area) + unreachable(login, 'Sign-in') + squashed(login, 'Sign-in')
     report['unnamed'] += unnamed(login, 'Sign-in')
     login.close()
     s.bootstrap('owner', 'strong-password', 'strong-password')
@@ -95,12 +124,14 @@ def run():
     report['window'] = [w.width(), w.height(), bool(getattr(w, 'start_maximized', False))]
     report['problems'] += problems_in(w, 'Main window', area)
     for i, page in enumerate(NAV):
-        w.show_page(i); app.processEvents()
+        w.show_page(i); app.processEvents(); app.processEvents()
         body = w.area.widget()
         need = body.layout().totalMinimumSize().width() if body.layout() else body.minimumSizeHint().width()
         if need > w.area.viewport().width():
-            report['problems'].append(f'{page}: needs {need}px wide, only {w.area.viewport().width()}px visible (sideways scrolling)')
-        report['problems'] += [p for p in problems_in(w, page, area) if 'cut off' in p] + unreachable(w, page)
+            widest = sorted(((c.minimumSizeHint().width(), type(c).__name__ + ':' + (getattr(c, 'text', lambda: '')() or c.accessibleName() or c.objectName()))
+                             for c in body.findChildren(QWidget) if c.isVisibleTo(body)), reverse=True)[:4]
+            report['problems'].append(f'{page}: needs {need}px wide, only {w.area.viewport().width()}px visible (sideways scrolling); widest: {widest}')
+        report['problems'] += [p for p in problems_in(w, page, area) if 'cut off' in p] + unreachable(w, page) + squashed(w, page)
         report['unnamed'] += unnamed(w, page)
     dialogs = [
         ('Add product form', lambda: Form(w, 'Product', [('sku', 'SKU *'), ('name', 'Item name *'), ('category', 'Category', ('Frames', 'Lenses')),
@@ -112,8 +143,8 @@ def run():
         ('Access Recovery', lambda: AccessRecovery(Path(tmp) / 'ainak_mahal.db')),
     ]
     for name, make in dialogs:
-        d = make(); d.show(); app.processEvents()
-        report['problems'] += problems_in(d, name, area) + unreachable(d, name)
+        d = make(); d.show(); app.processEvents(); app.processEvents()
+        report['problems'] += problems_in(d, name, area) + unreachable(d, name) + squashed(d, name)
         report['unnamed'] += unnamed(d, name)
         d.close()
     w.close(); s.close()

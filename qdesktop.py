@@ -2,9 +2,10 @@
 import html
 from datetime import date,timedelta
 from pathlib import Path
-from PySide6.QtCore import Qt,QTimer,QSizeF,QMarginsF,QRect,QPoint,QSize
+from PySide6.QtCore import Qt,QTimer,QSizeF,QMarginsF,QRect,QPoint,QSize,QEvent
 from PySide6.QtGui import QIcon,QKeySequence,QShortcut,QPainter,QPen,QColor,QFont,QPageSize,QPageLayout
 from PySide6.QtWidgets import *
+from PySide6.QtWidgets import QLayout
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtPrintSupport import QPrinter,QPrintDialog
 from hardware import printer_choices,apply_printer,print_label,label_size,LABEL_SIZES,DEFAULT_LABEL,SYSTEM_DEFAULT,RECEIPT_KINDS
@@ -67,7 +68,7 @@ def action(text,callback,primary=False):
     if primary:b.setObjectName('primary')
     return b
 def combo(items):
-    w=QComboBox()
+    w=QComboBox();w.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon);w.setMinimumContentsLength(12)  # a long customer name must not widen the page
     for text,val in (items.items() if isinstance(items,dict) else [(x,x) for x in items]):w.addItem(str(text),val)
     return w
 def value(w):return w.currentData() if isinstance(w,QComboBox) else w.value() if isinstance(w,QSpinBox) else w.isChecked() if isinstance(w,QCheckBox) else w.text().strip()
@@ -75,6 +76,39 @@ def error_text(ex):
     import sqlite3
     if isinstance(ex,sqlite3.IntegrityError):return 'This record conflicts with existing data. Check unique SKU, barcode, username, reference or closing date, and confirm linked records exist.'
     return str(ex)
+
+class ResponsiveGrid(QWidget):
+    """Places items side by side while they fit, otherwise in fewer columns (one column on narrow or zoomed screens)."""
+    def __init__(self,items,columns,weights=None,spacing=16):
+        super().__init__();self.items=list(items);self.max_columns=columns;self.weights=weights or [1]*columns;self.columns=0
+        self.grid=QGridLayout(self);self.grid.setContentsMargins(0,0,0,0);self.grid.setSpacing(spacing);self.grid.setSizeConstraint(QLayout.SetNoConstraint)
+        self.place(1)
+    def item_minimum(self):return max([i.minimumSizeHint().width() for i in self.items] or [0])
+    def fitting(self,width):
+        for n in range(self.max_columns,1,-1):
+            need=sum(sorted((i.minimumSizeHint().width() for i in self.items),reverse=True)[:n])+self.grid.spacing()*(n-1)
+            if need<=width:return n
+        return 1
+    def place(self,n):
+        if n==self.columns:return
+        self.columns=n
+        for i in self.items:self.grid.removeWidget(i)
+        for c in range(self.max_columns):self.grid.setColumnStretch(c,0)
+        for k,i in enumerate(self.items):self.grid.addWidget(i,k//n,k%n)
+        for c in range(n):self.grid.setColumnStretch(c,self.weights[c] if n==self.max_columns else 1)
+        self.updateGeometry()
+    def needed_height(self,width):
+        # Cards wrap their text, so the height they need depends on the width they get.
+        return self.grid.totalHeightForWidth(width) if self.grid.hasHeightForWidth() else self.grid.totalMinimumSize().height()
+    def resizeEvent(self,event):
+        width=event.size().width();self.place(self.fitting(width));super().resizeEvent(event)
+        need=self.needed_height(width)
+        if need!=self.minimumHeight():self.setMinimumHeight(need)
+    def minimumSizeHint(self):
+        # Width: one item (columns are dropped when space runs out). Height: what the current arrangement needs.
+        return QSize(self.item_minimum(),self.needed_height(max(self.width(),self.item_minimum())))
+    def sizeHint(self):
+        return QSize(sum(i.sizeHint().width() for i in self.items),self.grid.totalSizeHint().height())
 
 class FlowBar(QLayout):
     """Button row that wraps onto the next line on narrow or zoomed screens instead of widening the window."""
@@ -129,6 +163,25 @@ def name_controls(root):
             heads=[widget.horizontalHeaderItem(c).text() for c in range(min(3,widget.columnCount())) if widget.horizontalHeaderItem(c)]
             widget.setAccessibleName('Table: '+', '.join(heads) if heads else 'Table')
 
+class PageArea(QScrollArea):
+    """Scroll area that gives wrapped text the height it needs at the real width.
+    QScrollArea alone sizes the page to the window, squeezing cards instead of scrolling."""
+    def __init__(self):
+        super().__init__();self.setWidgetResizable(True);self.setFrameShape(QFrame.NoFrame)
+    def setWidget(self,widget):
+        super().setWidget(widget);widget.installEventFilter(self);QTimer.singleShot(0,self.fit_page)
+    def eventFilter(self,obj,event):
+        if obj is self.widget() and event.type()==QEvent.LayoutRequest:QTimer.singleShot(0,self.fit_page)
+        return super().eventFilter(obj,event)
+    def resizeEvent(self,event):
+        super().resizeEvent(event);self.fit_page()
+    def fit_page(self):
+        page=self.widget()
+        if page is None or page.layout() is None:return
+        width=self.viewport().width()
+        need=page.layout().totalHeightForWidth(width) if page.layout().hasHeightForWidth() else page.layout().totalMinimumSize().height()
+        if need>0 and need!=page.minimumHeight():page.setMinimumHeight(need)
+
 def available_area(widget=None):
     screen=(widget.screen() if widget is not None else None) or QApplication.primaryScreen()
     return screen.availableGeometry() if screen else QRect(0,0,1366,690)
@@ -141,7 +194,7 @@ def fit_to_screen(widget,width,height,frame=40):
 
 def scrolling(inner):
     """Wrap a dialog's content so nothing is cut off when the screen is short."""
-    area=QScrollArea();area.setWidgetResizable(True);area.setFrameShape(QFrame.NoFrame);area.setWidget(inner);return area
+    area=PageArea();area.setWidget(inner);return area
 
 class NumberItem(QTableWidgetItem):
     def __lt__(self,other):
@@ -227,10 +280,10 @@ class Window(QMainWindow):
             if s.role!='admin' and i in (6,8,10,11):b.setEnabled(False);b.setToolTip('Administrator access required')
             if i in (3,7):nav.addSpacing(6)
         nav.addStretch();nav.addWidget(label('●  OFFLINE · LOCAL DATA'));nav.addWidget(label(f'{s.actor} / {s.role}'))
-        side=QVBoxLayout(sidebar);side.setContentsMargins(0,0,0,0);menu_area=scrolling(menu);menu_area.setObjectName('sidebar');menu_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff);side.addWidget(menu_area);layout.addWidget(sidebar)
+        side=QVBoxLayout(sidebar);side.setContentsMargins(0,0,0,0);menu_area=scrolling(menu);menu_area.setObjectName('sidebar');menu_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff);side.addWidget(menu_area);sidebar.setFixedWidth(max(220,menu.sizeHint().width()+12));layout.addWidget(sidebar)
         right=QWidget();right.setObjectName('canvas');content=vbox(right,24,14);layout.addWidget(right,1);top=QHBoxLayout();top.addWidget(label('AINAK MAHAL / WORKSPACE','eyebrow'));top.addStretch()
         self.search=QLineEdit();self.search.setPlaceholderText('Search workspace…  Ctrl+K');self.search.setMinimumWidth(180);self.search.returnPressed.connect(lambda:self.safe(self.global_search));top.addWidget(self.search);top.addWidget(action('Refresh',lambda:self.safe(self.refresh)));top.addWidget(label('Offline','badge'));content.addLayout(top)
-        self.title=label('','heading');content.addWidget(self.title);self.subtitle=label('','muted');content.addWidget(self.subtitle);self.area=QScrollArea();self.area.setWidgetResizable(True);content.addWidget(self.area,1);self.notice=label('All changes are saved on this computer.','muted')
+        self.title=label('','heading');content.addWidget(self.title);self.subtitle=label('','muted');content.addWidget(self.subtitle);self.area=PageArea();content.addWidget(self.area,1);self.notice=label('All changes are saved on this computer.','muted')
         footer=QHBoxLayout();footer.addWidget(self.notice,1);version=label(DISPLAY_VERSION,'muted');version.setStyleSheet('font-size:8pt;color:#526277');footer.addWidget(version,0,Qt.AlignRight);content.addLayout(footer)
         QShortcut(QKeySequence('F2'),self,activated=lambda:self.show_page(1));QShortcut(QKeySequence('F3'),self,activated=lambda:self.show_page(2));QShortcut(QKeySequence('Ctrl+K'),self,activated=self.search.setFocus);QShortcut(QKeySequence('Ctrl+Return'),self,activated=lambda:self.safe(self.complete) if self.current==1 else None);self.show_page(0)
     def safe(self,f):
@@ -264,16 +317,16 @@ class Window(QMainWindow):
     def searchable(self,t,placeholder='Filter this table…'):
         e=QLineEdit();e.setPlaceholderText(placeholder);e.textChanged.connect(t.filter);self.body.insertWidget(0,e);return e
     def dashboard(self):
-        metrics=self.s.dashboard();grid=QGridLayout()
+        metrics=self.s.dashboard();cards=[]
         for i,(name,n) in enumerate(metrics.items()):
             w,l=card();l.addWidget(label('Gross sales today' if i==0 else name,'muted'));l.addWidget(label(f'PKR {n:,.0f}' if i<3 else str(n),'metric'))
             if i>=3:l.addWidget(action('Review low stock' if i==3 else 'Open optical jobs',lambda i=i:self.show_page(4 if i==3 else 5)))
-            grid.addWidget(w,i//3,i%3)
-        self.body.addLayout(grid);bar=self.bar();self.button(bar,'New optical sale  F2',lambda:self.show_page(1),True);self.button(bar,'Add customer',self.new_customer);self.button(bar,'New repair',self.new_job);bar.addStretch()
-        panels=QHBoxLayout();w,l=card('Gross invoice sales · last seven days');points=[]
+            cards.append(w)
+        self.body.addWidget(ResponsiveGrid(cards,3));bar=self.bar();self.button(bar,'New optical sale  F2',lambda:self.show_page(1),True);self.button(bar,'Add customer',self.new_customer);self.button(bar,'New repair',self.new_job);bar.addStretch()
+        panels=[];w,l=card('Gross invoice sales · last seven days');points=[]
         for i in range(6,-1,-1):
             d=(date.today()-timedelta(days=i)).isoformat();points.append((d,self.s.scalar('SELECT COALESCE(SUM(total),0) FROM sales WHERE substr(date,1,10)=?',(d,))))
-        l.addWidget(Trend(points));panels.addWidget(w,2);w,l=card('Ready for collection');ready=[r for r in self.s.job_list() if r[4]=='Ready'];l.addWidget(label(f'{len(ready)} jobs ready','metric'));l.addWidget(label('Collect the remaining balance before handing over a completed job.','muted'));l.addWidget(action('View jobs',lambda:self.show_page(5)));panels.addWidget(w,1);self.body.addLayout(panels)
+        l.addWidget(Trend(points));panels.append(w);w,l=card('Ready for collection');ready=[r for r in self.s.job_list() if r[4]=='Ready'];l.addWidget(label(f'{len(ready)} jobs ready','metric'));l.addWidget(label('Collect the remaining balance before handing over a completed job.','muted'));l.addWidget(action('View jobs',lambda:self.show_page(5)));panels.append(w);self.body.addWidget(ResponsiveGrid(panels,2,(2,1)))
         w,l=card('Recent transactions');self.table(('Invoice','Customer','Date','Total PKR','Paid PKR','Balance PKR'),self.s.sales()[:6],l);self.body.addWidget(w)
     def new_customer(self,row=None):
         p=self.s.profile(row[0]) if row else {}
@@ -305,7 +358,7 @@ class Window(QMainWindow):
             QMessageBox.information(self,'Optical calculation',f'Transposed: {s+c:+.2f} / {-c:+.2f} × {(a+90-1)%180+1}°\nSpherical equivalent: {s+c/2:+.2f} D')
         self.form('Optical calculations',[('sph','SPH *'),('cyl','CYL *'),('axis','AXIS *')],calc,'Mathematical conversion only. Verify measurements and use professional judgement.')
     def pos(self):
-        columns=QHBoxLayout();columns.setSpacing(20);left=QWidget();ll=vbox(left);right=QWidget();rl=vbox(right);right.setMinimumWidth(300);right.setMaximumWidth(390);columns.addWidget(left,3);columns.addWidget(right,2);self.body.addLayout(columns)
+        left=QWidget();ll=vbox(left);right=QWidget();rl=vbox(right);right.setMinimumWidth(300);self.body.addWidget(ResponsiveGrid((left,right),2,(3,2),20))
         w,l=card('1  Customer & prescription');self.pos_customer=combo(self.customer_choices(True));self.pos_customer.setAccessibleName('Customer');l.addWidget(self.pos_customer)
         self.new_name=QLineEdit();self.new_name.setPlaceholderText('New customer name · optional');self.new_phone=QLineEdit();self.new_phone.setPlaceholderText('New customer mobile');nr=QHBoxLayout();nr.addWidget(self.new_name);nr.addWidget(self.new_phone);l.addLayout(nr)
         self.pos_rx=combo({'No prescription':None});self.pos_rx.setAccessibleName('Prescription');l.removeWidget(self.pos_customer);customer_row=QHBoxLayout();customer_row.addWidget(self.pos_customer,1);customer_row.addWidget(self.pos_rx,1);l.insertLayout(1,customer_row)
@@ -529,7 +582,7 @@ class Window(QMainWindow):
 class Login(QWidget):
     def __init__(self,s,on_login):
         super().__init__();self.s=s;self.on_login=on_login;self.setWindowTitle('Ainak Mahal · Sign in');self.setMinimumSize(720,480);fit_to_screen(self,1040,700);self.setWindowIcon(QIcon(str(ASSETS/'ainak-mahal.ico')));outer=QHBoxLayout(self);outer.setContentsMargins(0,0,0,0);outer.setSpacing(0)
-        hero=QFrame();hero.setObjectName('sidebar');left=vbox(hero,44,20);logo=QSvgWidget(str(ASSETS/'logo-dark.svg'));logo.setFixedSize(280,72);left.addWidget(logo);left.addStretch();h=label('A clearer view\nof your shop.');h.setStyleSheet('font-size:30pt;color:white;font-weight:600');left.addWidget(h);left.addWidget(label('Customers, prescriptions and eyewear.\nEvery order, from counter to collection.'));left.addSpacing(24);left.addWidget(label('01   Connected optical orders\n\n02   Accurate stock and balances\n\n03   Your data, safely offline'));left.addStretch();footer=QWidget();footer_layout=vbox(footer,0,4);footer_layout.addWidget(label('MILLAT CHOWK · FAISALABAD'));credit=label(DEVELOPER_CREDIT);credit.setObjectName('developerCredit');credit.setStyleSheet('font-size:9pt;color:#C9D8E7');footer_layout.addWidget(credit);build=label(DISPLAY_VERSION);build.setStyleSheet('font-size:8pt;color:#AFC4DA');footer_layout.addWidget(build);left.addWidget(footer);outer.addWidget(hero,1)
+        hero=QFrame();hero.setObjectName('sidebar');left=vbox(hero,44,20);logo=QSvgWidget(str(ASSETS/'logo-dark.svg'));logo.setFixedSize(280,72);left.addWidget(logo);left.addStretch();h=label('A clearer view\nof your shop.');h.setStyleSheet('font-size:30pt;color:white;font-weight:600');left.addWidget(h);left.addWidget(label('Customers, prescriptions and eyewear.\nEvery order, from counter to collection.'));left.addSpacing(24);left.addWidget(label('01   Connected optical orders\n\n02   Accurate stock and balances\n\n03   Your data, safely offline'));left.addStretch();footer=QWidget();footer_layout=vbox(footer,0,4);footer_layout.addWidget(label('MILLAT CHOWK · FAISALABAD'));credit=label(DEVELOPER_CREDIT);credit.setObjectName('developerCredit');credit.setStyleSheet('font-size:9pt;color:#C9D8E7');footer_layout.addWidget(credit);build=label(DISPLAY_VERSION);build.setStyleSheet('font-size:8pt;color:#AFC4DA');footer_layout.addWidget(build);left.addWidget(footer);hero_area=scrolling(hero);hero_area.setObjectName('sidebar');hero_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff);outer.addWidget(hero_area,1)
         right=QWidget();right.setObjectName('canvas');rl=vbox(right,48,16);rl.addStretch();first=s.first_run();rl.addWidget(label('YOUR LOCAL WORKSPACE','eyebrow'));rl.addWidget(label('Set up your shop' if first else 'Welcome back','heading'));rl.addWidget(label('Create your administrator account. No internet or subscription required.' if first else 'Sign in to continue. Your data stays on this computer.','muted'));self.fields={}
         for key,title in [('username','Username'),('password','Password')]+([('confirm','Confirm password')] if first else []):
             rl.addWidget(label(title));entry=QLineEdit();entry.setAccessibleName(title)
