@@ -2,7 +2,7 @@
 import html
 from datetime import date,timedelta
 from pathlib import Path
-from PySide6.QtCore import Qt,QTimer,QSizeF,QMarginsF
+from PySide6.QtCore import Qt,QTimer,QSizeF,QMarginsF,QRect,QPoint,QSize
 from PySide6.QtGui import QIcon,QKeySequence,QShortcut,QPainter,QPen,QColor,QFont,QPageSize,QPageLayout
 from PySide6.QtWidgets import *
 from PySide6.QtSvgWidgets import QSvgWidget
@@ -30,6 +30,11 @@ QPushButton#primary{background:#2563EB;color:white;border:1px solid #2563EB;}
 QPushButton#primary:hover{background:#1D4ED8;} QPushButton#primary:pressed{background:#1E40AF;}
 QPushButton#nav{text-align:left;color:#C9D8E7;background:transparent;border:0;padding:9px 12px;}
 QPushButton#nav:hover{background:#1D3D63;color:white;} QPushButton#nav:checked{background:#264B74;color:white;border-left:3px solid #2DD4BF;}
+QPushButton#nav:focus{background:#1D3D63;color:white;border:2px solid #FBBF24;}
+QCheckBox:focus,QRadioButton:focus{background:#DBEAFE;border-radius:6px;} QTabBar::tab:focus{border:2px solid #2563EB;}
+QTableWidget:focus{border:2px solid #2563EB;} QPlainTextEdit:focus,QTextBrowser:focus{border:2px solid #2563EB;}
+QScrollArea#sidebar,QScrollArea#sidebar>QWidget>QWidget{background:#142D4E;}
+QScrollArea#sidebar QScrollBar:vertical{background:#142D4E;width:6px;} QScrollArea#sidebar QScrollBar::handle:vertical{background:#3B5A80;border-radius:3px;min-height:24px;}
 QLineEdit,QComboBox,QSpinBox{background:white;border:1px solid #CBD5E1;border-radius:7px;padding:8px;min-height:20px;selection-background-color:#DBEAFE;}
 QLineEdit:focus,QComboBox:focus,QSpinBox:focus{border:2px solid #2563EB;}
 QComboBox::drop-down{border:0;width:24px;} QComboBox QAbstractItemView{background:white;selection-background-color:#DBEAFE;}
@@ -40,6 +45,12 @@ QTabBar::tab{padding:10px 18px;background:#F1F5F9;border:0;} QTabBar::tab:select
 QScrollArea{border:0;background:transparent;} QScrollBar:vertical{background:#F1F5F9;width:10px;} QScrollBar::handle:vertical{background:#CBD5E1;border-radius:5px;min-height:24px;}
 QCheckBox{spacing:8px;padding:5px;} QToolTip{background:#142D4E;color:white;padding:6px;}
 '''
+
+PLACEHOLDER='#64748B'   # 4.76:1 on white; Qt's default grey is about 3.4:1 (below WCAG AA)
+def apply_theme(app):
+    """Style plus palette colours a stylesheet cannot set."""
+    from PySide6.QtGui import QPalette
+    app.setStyleSheet(STYLE);palette=app.palette();palette.setColor(QPalette.PlaceholderText,QColor(PLACEHOLDER));app.setPalette(palette)
 
 def label(text,kind=None):
     w=QLabel(str(text));w.setWordWrap(True)
@@ -64,6 +75,73 @@ def error_text(ex):
     import sqlite3
     if isinstance(ex,sqlite3.IntegrityError):return 'This record conflicts with existing data. Check unique SKU, barcode, username, reference or closing date, and confirm linked records exist.'
     return str(ex)
+
+class FlowBar(QLayout):
+    """Button row that wraps onto the next line on narrow or zoomed screens instead of widening the window."""
+    def __init__(self,parent=None,spacing=8):
+        super().__init__(parent);self.items=[];self.setSpacing(spacing);self.setContentsMargins(0,0,0,0)
+    def addItem(self,item):self.items.append(item)
+    def addStretch(self,*_):pass
+    def addSpacing(self,*_):pass
+    def count(self):return len(self.items)
+    def itemAt(self,i):return self.items[i] if 0<=i<len(self.items) else None
+    def takeAt(self,i):return self.items.pop(i) if 0<=i<len(self.items) else None
+    def expandingDirections(self):return Qt.Orientations(0)
+    def hasHeightForWidth(self):return True
+    def heightForWidth(self,width):return self.arrange(QRect(0,0,width,0),False)
+    def setGeometry(self,rect):super().setGeometry(rect);self.arrange(rect,True)
+    def sizeHint(self):
+        w=sum(i.sizeHint().width() for i in self.items)+self.spacing()*max(0,len(self.items)-1)
+        h=max([i.sizeHint().height() for i in self.items] or [0]);return QSize(w,h)
+    def minimumSize(self):
+        size=QSize()
+        for i in self.items:size=size.expandedTo(i.minimumSize())
+        return size
+    def arrange(self,rect,apply):
+        x,y,line=rect.x(),rect.y(),0
+        for item in self.items:
+            if item.isEmpty():continue
+            hint=item.sizeHint()
+            if x>rect.x() and x+hint.width()>rect.right()+1:x=rect.x();y+=line+self.spacing();line=0
+            if apply:item.setGeometry(QRect(QPoint(x,y),hint))
+            x+=hint.width()+self.spacing();line=max(line,hint.height())
+        return y+line-rect.y()
+
+def name_controls(root):
+    """Give every input a name screen readers can announce: its caption label, else its placeholder or table headings."""
+    from PySide6.QtWidgets import QLayout as _L
+    inputs=(QLineEdit,QComboBox,QSpinBox,QTableWidget,QPlainTextEdit)
+    def walk(layout):
+        previous=None
+        for i in range(layout.count()):
+            item=layout.itemAt(i);widget=item.widget();child=item.layout()
+            if child is not None:walk(child);previous=None;continue
+            if isinstance(widget,inputs) and not widget.accessibleName() and isinstance(previous,QLabel) and previous.text().strip():
+                widget.setAccessibleName(previous.text().strip().rstrip(':'))
+            previous=widget
+    for widget in [root]+root.findChildren(QWidget):
+        if widget.layout() is not None and not isinstance(widget.layout(),QFormLayout):walk(widget.layout())
+    for widget in root.findChildren(QWidget):
+        if widget.accessibleName() or not isinstance(widget,inputs):continue
+        if isinstance(widget,QLineEdit) and isinstance(widget.parentWidget(),(QComboBox,QSpinBox)):continue
+        if isinstance(widget,QLineEdit) and widget.placeholderText():widget.setAccessibleName(widget.placeholderText().replace('…','').strip())
+        elif isinstance(widget,QTableWidget):
+            heads=[widget.horizontalHeaderItem(c).text() for c in range(min(3,widget.columnCount())) if widget.horizontalHeaderItem(c)]
+            widget.setAccessibleName('Table: '+', '.join(heads) if heads else 'Table')
+
+def available_area(widget=None):
+    screen=(widget.screen() if widget is not None else None) or QApplication.primaryScreen()
+    return screen.availableGeometry() if screen else QRect(0,0,1366,690)
+
+def fit_to_screen(widget,width,height,frame=40):
+    """Start at the preferred size, but never larger than the usable screen (taskbar and title bar excluded)."""
+    area=available_area(widget);w=min(width,area.width()-16);h=min(height,area.height()-frame)
+    widget.setMinimumSize(min(widget.minimumWidth(),w),min(widget.minimumHeight(),h));widget.resize(w,h)
+    return w<width or h<height
+
+def scrolling(inner):
+    """Wrap a dialog's content so nothing is cut off when the screen is short."""
+    area=QScrollArea();area.setWidgetResizable(True);area.setFrameShape(QFrame.NoFrame);area.setWidget(inner);return area
 
 class NumberItem(QTableWidgetItem):
     def __lt__(self,other):
@@ -99,7 +177,7 @@ class Table(QTableWidget):
 
 class Form(QDialog):
     def __init__(self,parent,title,fields,save,context=''):
-        super().__init__(parent);self.setWindowTitle(title);self.resize(650,650);self.setMinimumSize(470,380);self.inputs={};self.save=save
+        super().__init__(parent);self.setWindowTitle(title);self.setMinimumSize(420,320);fit_to_screen(self,650,650);self.inputs={};self.save=save
         outer=vbox(self,24);outer.addWidget(label(title,'section'))
         if context:outer.addWidget(label(context,'muted'))
         area=QScrollArea();area.setWidgetResizable(True);body=QWidget();form=QFormLayout(body);form.setVerticalSpacing(14);form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow);area.setWidget(body);outer.addWidget(area,1);eye_grid=None
@@ -140,17 +218,18 @@ class Trend(QWidget):
 
 class Window(QMainWindow):
     def __init__(self,s):
-        super().__init__();self.s=s;self.cart=[];self.current=0;self.report_data=None;self.resize(1440,920);self.setMinimumSize(1080,720)
+        super().__init__();self.s=s;self.cart=[];self.current=0;self.report_data=None;self.setMinimumSize(900,500);self.start_maximized=fit_to_screen(self,1440,920)
         self.setWindowTitle(f'Ainak Mahal · Desktop ERP {VERSION}');self.setWindowIcon(QIcon(str(ASSETS/'ainak-mahal.ico')))
         shell=QWidget();self.setCentralWidget(shell);layout=QHBoxLayout(shell);layout.setContentsMargins(0,0,0,0);layout.setSpacing(0)
-        sidebar=QFrame();sidebar.setObjectName('sidebar');sidebar.setFixedWidth(220);nav=vbox(sidebar,16,5);brand=QSvgWidget(str(ASSETS/'logo-dark.svg'));brand.setFixedSize(184,55);nav.addWidget(brand);nav.addWidget(label('OPTICAL STORE / FAISALABAD'));nav.addSpacing(18);self.nav=[]
+        sidebar=QFrame();sidebar.setObjectName('sidebar');sidebar.setFixedWidth(220);menu=QWidget();menu.setObjectName('sidebar');nav=vbox(menu,16,5);brand=QSvgWidget(str(ASSETS/'logo-dark.svg'));brand.setFixedSize(184,55);nav.addWidget(brand);nav.addWidget(label('OPTICAL STORE / FAISALABAD'));nav.addSpacing(18);self.nav=[]
         for i,name in enumerate(NAV):
             b=action(name,lambda i=i:self.safe(lambda:self.show_page(i)));b.setObjectName('nav');b.setCheckable(True);nav.addWidget(b);self.nav.append(b)
             if s.role!='admin' and i in (6,8,10,11):b.setEnabled(False);b.setToolTip('Administrator access required')
             if i in (3,7):nav.addSpacing(6)
-        nav.addStretch();nav.addWidget(label('●  OFFLINE · LOCAL DATA'));nav.addWidget(label(f'{s.actor} / {s.role}'));layout.addWidget(sidebar)
+        nav.addStretch();nav.addWidget(label('●  OFFLINE · LOCAL DATA'));nav.addWidget(label(f'{s.actor} / {s.role}'))
+        side=QVBoxLayout(sidebar);side.setContentsMargins(0,0,0,0);menu_area=scrolling(menu);menu_area.setObjectName('sidebar');menu_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff);side.addWidget(menu_area);layout.addWidget(sidebar)
         right=QWidget();right.setObjectName('canvas');content=vbox(right,24,14);layout.addWidget(right,1);top=QHBoxLayout();top.addWidget(label('AINAK MAHAL / WORKSPACE','eyebrow'));top.addStretch()
-        self.search=QLineEdit();self.search.setPlaceholderText('Search workspace…  Ctrl+K');self.search.setMinimumWidth(260);self.search.returnPressed.connect(lambda:self.safe(self.global_search));top.addWidget(self.search);top.addWidget(action('Refresh',lambda:self.safe(self.refresh)));top.addWidget(label('Offline','badge'));content.addLayout(top)
+        self.search=QLineEdit();self.search.setPlaceholderText('Search workspace…  Ctrl+K');self.search.setMinimumWidth(180);self.search.returnPressed.connect(lambda:self.safe(self.global_search));top.addWidget(self.search);top.addWidget(action('Refresh',lambda:self.safe(self.refresh)));top.addWidget(label('Offline','badge'));content.addLayout(top)
         self.title=label('','heading');content.addWidget(self.title);self.subtitle=label('','muted');content.addWidget(self.subtitle);self.area=QScrollArea();self.area.setWidgetResizable(True);content.addWidget(self.area,1);self.notice=label('All changes are saved on this computer.','muted')
         footer=QHBoxLayout();footer.addWidget(self.notice,1);version=label(DISPLAY_VERSION,'muted');version.setStyleSheet('font-size:8pt;color:#526277');footer.addWidget(version,0,Qt.AlignRight);content.addLayout(footer)
         QShortcut(QKeySequence('F2'),self,activated=lambda:self.show_page(1));QShortcut(QKeySequence('F3'),self,activated=lambda:self.show_page(2));QShortcut(QKeySequence('Ctrl+K'),self,activated=self.search.setFocus);QShortcut(QKeySequence('Ctrl+Return'),self,activated=lambda:self.safe(self.complete) if self.current==1 else None);self.show_page(0)
@@ -167,10 +246,10 @@ class Window(QMainWindow):
             1:'Customer → prescription → eyewear → payment. One connected optical order.',2:'Search by name, mobile or customer number. Open a profile for the full history.',3:'OD = right eye · OS = left eye · Powers in dioptres · PD in millimetres.',4:'Know what is available, what needs replenishing and where every unit went.',5:'New glasses, lens replacements and repairs — from intake to delivery.',6:'Order, receive and pay suppliers. Receipt updates stock in one transaction.',7:'Collect balances, settle returns and record completed refunds.',8:'Cash movements, expenses and a clear daily count.',9:'Filter dated activity or inspect current stock and balances.',10:'Your shop identity, staff accounts and audit trail.',11:'Verified backups, safe recovery and local data checks.'}[index])
         old=self.area.takeWidget()
         if old:old.deleteLater()
-        page=QWidget();page.setObjectName('canvas');self.body=vbox(page,0,16);self.area.setWidget(page);getattr(self,('dashboard','pos','customers','rx','inventory','jobs','purchasing','payments','accounts','reports','settings','backup')[index])()
+        page=QWidget();page.setObjectName('canvas');self.body=vbox(page,0,16);self.area.setWidget(page);getattr(self,('dashboard','pos','customers','rx','inventory','jobs','purchasing','payments','accounts','reports','settings','backup')[index])();name_controls(self)
     def refresh(self):self.show_page(self.current)
     def bar(self,parent=None):
-        bar=QHBoxLayout();bar.setSpacing(8);(parent or self.body).addLayout(bar);return bar
+        bar=FlowBar();(parent or self.body).addLayout(bar);return bar
     def button(self,bar,text,callback,primary=False):
         b=action(text,lambda:self.safe(callback),primary);bar.addWidget(b);return b
     def form(self,title,fields,save,context=''):
@@ -208,7 +287,7 @@ class Window(QMainWindow):
         bar=self.bar();self.button(bar,'Open profile',lambda:self.customer_profile(t.selected()[0]));self.button(bar,'Edit contact details',lambda:self.new_customer(t.selected()));self.button(bar,'Export customers',lambda:self.export_table(t));t.itemDoubleClicked.connect(lambda *_:self.safe(lambda:self.customer_profile(t.selected()[0])))
         if not t.rowCount():self.body.addWidget(label('No customers yet. Add one to keep prescriptions, orders and balances together.','muted'))
     def customer_profile(self,cid):
-        r=next(r for r in self.s.customers(str(cid)) if r[0]==cid);sales,rx,jobs=self.s.customer_position(cid);p=self.s.profile(cid);d=QDialog(self);d.setWindowTitle(r[1]+' · Profile');d.resize(1060,690);l=vbox(d,24)
+        r=next(r for r in self.s.customers(str(cid)) if r[0]==cid);sales,rx,jobs=self.s.customer_position(cid);p=self.s.profile(cid);d=QDialog(self);d.setWindowTitle(r[1]+' · Profile');fit_to_screen(d,1060,690);l=vbox(d,24)
         l.addWidget(label(r[1],'heading'));l.addWidget(label(f'Customer #{cid} · {r[2] or "No mobile"} · {r[3] or "No address"}','muted'));l.addWidget(label(f'Net balance PKR {sum(r[5] for r in sales):,.2f} / {len(sales)} invoices / {len(rx)} prescriptions','section'))
         if p['doctor'] or p['whatsapp']:l.addWidget(label(f'Referred by: {p["doctor"] or "—"} · WhatsApp: {p["whatsapp"] or "—"}','muted'))
         tabs=Tabs();l.addWidget(tabs,1)
@@ -247,8 +326,8 @@ class Window(QMainWindow):
         w,l=card('3  Checkout');self.discount=QLineEdit(getattr(self,'draft_discount','0'));self.paid=QLineEdit(getattr(self,'draft_paid','0'));self.payment_method=combo(('Cash','Bank','Card'))
         for text,widget in (('Discount · PKR',self.discount),('Amount received · PKR',self.paid),('Payment method',self.payment_method)):l.addWidget(label(text,'muted'));l.addWidget(widget)
         self.total=label('','section');l.addWidget(self.total);self.discount.textChanged.connect(self.redraw_cart);self.paid.textChanged.connect(self.redraw_cart);self.button(l,'Save optical order   Ctrl+Enter',self.complete,True);l.addWidget(label('Enter money retained after giving change. A balance requires a named customer.','muted'));rl.addWidget(w)
-        w,l=card('4  Optical job · optional');self.make_job=QCheckBox('Create a linked optical job');l.addWidget(self.make_job);self.job_kind=combo(('New glasses','Lens replacement','Frame repair','General repair'));l.addWidget(self.job_kind);self.job_note=QLineEdit();self.job_note.setPlaceholderText('Lab instructions');l.addWidget(self.job_note)
-        self.job_due=QLineEdit(date.today().isoformat());self.job_due.setAccessibleName('Promised date');l.addWidget(label('Promised date · YYYY-MM-DD','muted'));l.addWidget(self.job_due);self.fulfillment=combo(('Collection','Delivery'));l.addWidget(self.fulfillment);rl.addWidget(w);rl.addStretch()
+        w,l=card('4  Optical job · optional');self.make_job=QCheckBox('Create a linked optical job');l.addWidget(self.make_job);self.job_kind=combo(('New glasses','Lens replacement','Frame repair','General repair'));self.job_kind.setAccessibleName('Job type');l.addWidget(self.job_kind);self.job_note=QLineEdit();self.job_note.setPlaceholderText('Lab instructions');l.addWidget(self.job_note)
+        self.job_due=QLineEdit(date.today().isoformat());self.job_due.setAccessibleName('Promised date');l.addWidget(label('Promised date · YYYY-MM-DD','muted'));l.addWidget(self.job_due);self.fulfillment=combo(('Collection','Delivery'));self.fulfillment.setAccessibleName('Collection or delivery');l.addWidget(self.fulfillment);rl.addWidget(w);rl.addStretch()
         for key,val in getattr(self,'pos_draft',{}).items():
             widget=getattr(self,key)
             if isinstance(widget,QComboBox):
@@ -286,7 +365,7 @@ class Window(QMainWindow):
         self.cart=[];self.draft_rx=None;self.draft_discount='0';self.draft_paid='0';self.pos_draft={};self.skip_stash=True;self.refresh();self.notice.setText(f'Invoice #{sid} saved · PKR {total:,.2f} · Balance PKR {due:,.2f}'+(' · Optical job created' if jid else ''))
         if QMessageBox.question(self,'Order saved',f'Invoice #{sid} is saved. Open its receipt now?')==QMessageBox.Yes:self.print_doc('Invoice',sid)
     def inventory(self):
-        products=self.s.products();physical=[r for r in products if not r[9]];bar=self.bar();self.button(bar,'Add product',self.new_product,True);category=combo(('All categories','Frames','Lenses','Contact lenses','Sunglasses','Accessories','Service'));bar.addWidget(category);bar.addStretch();self.body.addWidget(label(f'{len(products)} catalog items · {sum(r[5] for r in physical)} physical units · {sum(r[5]<=r[8] for r in physical)} low stock','muted'))
+        products=self.s.products();physical=[r for r in products if not r[9]];bar=self.bar();self.button(bar,'Add product',self.new_product,True);category=combo(('All categories','Frames','Lenses','Contact lenses','Sunglasses','Accessories','Service'));category.setAccessibleName('Filter by category');bar.addWidget(category);bar.addStretch();self.body.addWidget(label(f'{len(products)} catalog items · {sum(r[5] for r in physical)} physical units · {sum(r[5]<=r[8] for r in physical)} low stock','muted'))
         t=self.table(('ID','SKU','Item','Category','Price PKR','Stock','Barcode','Variant','Reorder','Service'),products);search=QLineEdit();search.setPlaceholderText('Search SKU, name, barcode or variant…');self.body.insertWidget(1,search)
         def filt():t.replace([r for r in self.s.products(search.text()) if value(category)=='All categories' or r[3]==value(category)])
         search.textChanged.connect(filt);category.currentIndexChanged.connect(filt);bar=self.bar();self.button(bar,'Edit item',lambda:self.edit_product(t.selected()));self.button(bar,'Adjust stock',lambda:self.adjust_stock(t.selected()));self.button(bar,'Stock history',lambda:self.stock_history(t.selected()));self.button(bar,'Lens matrix',self.lens_matrix);self.button(bar,'Print label',lambda:self.product_label(t.selected()))
@@ -305,12 +384,12 @@ class Window(QMainWindow):
         from hardware_ui import HardwareCheck
         self.s.authorize(True);HardwareCheck(self,self.s).exec();self.refresh()
     def viewer(self,title,cols,rows):
-        d=QDialog(self);d.setWindowTitle(title);d.resize(1000,650);l=vbox(d,24);l.addWidget(label(title,'section'));t=Table(cols,rows);l.addWidget(t,1);bar=QHBoxLayout();bar.addWidget(action('Export CSV',lambda:self.safe(lambda:self.export_table(t))));bar.addWidget(action('Close',d.accept));l.addLayout(bar);d.exec()
+        d=QDialog(self);d.setWindowTitle(title);fit_to_screen(d,1000,650);l=vbox(d,24);l.addWidget(label(title,'section'));t=Table(cols,rows);l.addWidget(t,1);bar=QHBoxLayout();bar.addWidget(action('Export CSV',lambda:self.safe(lambda:self.export_table(t))));bar.addWidget(action('Close',d.accept));l.addLayout(bar);d.exec()
     def new_job(self):
         fields=[('customer','Customer *',self.customer_choices()),('kind','Job type',('New glasses','Lens replacement','Frame repair','General repair')),('description','Instructions *'),('due','Promised date *',None,date.today().isoformat()),('invoice','Existing invoice # · optional'),('rx','Existing Rx # · optional'),('charge','New repair charges PKR',None,0),('paid','Advance received PKR',None,0),('method','Advance method',('Cash','Bank','Card')),('fulfillment','Fulfillment',('Collection','Delivery')),('supplier','Outsourced supplier',{'In-house':None,**{f'{r[1]} · #{r[0]}':r[0] for r in self.s.suppliers()}})]
         self.form('Optical job or repair',fields,lambda v:self.s.create_job(v['customer'],v['kind'],v['description'],v['due'],int(v['invoice']) if v['invoice'] else None,int(v['rx']) if v['rx'] else None,v['fulfillment'],v['supplier'],v['charge'],v['paid'],v['method']),'For a linked sale, charges/payments belong on that invoice. For a new repair, enter charges and advance here.')
     def jobs(self):
-        bar=self.bar();self.button(bar,'New optical job / repair',self.new_job,True);status=combo(('Active jobs','All jobs','Pending','In Lab','Ready','Delivered','Cancelled'));bar.addWidget(status);bar.addStretch();t=self.table(('Job ID','Customer','Type','Instructions','Status','Promised','Invoice','Rx','Fulfillment','Lab / supplier'),self.s.job_list())
+        bar=self.bar();self.button(bar,'New optical job / repair',self.new_job,True);status=combo(('Active jobs','All jobs','Pending','In Lab','Ready','Delivered','Cancelled'));status.setAccessibleName('Filter by job status');bar.addWidget(status);bar.addStretch();t=self.table(('Job ID','Customer','Type','Instructions','Status','Promised','Invoice','Rx','Fulfillment','Lab / supplier'),self.s.job_list())
         def filt():t.replace([r for r in self.s.job_list() if value(status)=='All jobs' or (value(status)=='Active jobs' and r[4] not in ('Delivered','Cancelled')) or r[4]==value(status)])
         status.currentIndexChanged.connect(filt);filt();self.searchable(t,'Filter customer, job number or instructions…')
         def update():
@@ -348,7 +427,7 @@ class Window(QMainWindow):
     def purchase_dialog(self,direct=False):
         self.s.authorize(True);suppliers={f'{r[1]} · #{r[0]}':r[0] for r in self.s.suppliers()};products=self.product_choices()
         if not suppliers or not products:raise ValueError('Add a supplier and products before creating a purchase')
-        d=QDialog(self);d.setWindowTitle('Goods receipt' if direct else 'Purchase order');d.resize(950,650);l=vbox(d,24);supplier=combo(suppliers);product=combo(products);l.addWidget(label('Supplier','section'));l.addWidget(supplier);l.addWidget(label('Product'));l.addWidget(product);qty=QSpinBox();qty.setRange(1,100000);cost=QLineEdit('0');row=QHBoxLayout();row.addWidget(label('Units'));row.addWidget(qty);row.addWidget(label('Unit cost PKR'));row.addWidget(cost);l.addLayout(row);lines=[];t=Table(('Product #','Units','Unit cost PKR'));l.addWidget(t,1)
+        d=QDialog(self);d.setWindowTitle('Goods receipt' if direct else 'Purchase order');fit_to_screen(d,950,650);l=vbox(d,24);supplier=combo(suppliers);product=combo(products);l.addWidget(label('Supplier','section'));l.addWidget(supplier);l.addWidget(label('Product'));l.addWidget(product);qty=QSpinBox();qty.setRange(1,100000);cost=QLineEdit('0');row=QHBoxLayout();row.addWidget(label('Units'));row.addWidget(qty);row.addWidget(label('Unit cost PKR'));row.addWidget(cost);l.addLayout(row);lines=[];t=Table(('Product #','Units','Unit cost PKR'));l.addWidget(t,1)
         def add():
             from core import money
             lines.append((value(product),qty.value(),money(cost.text())/100));t.replace(lines)
@@ -390,7 +469,7 @@ class Window(QMainWindow):
         self.button(bar,'Close day',lambda:self.form('Daily cash closing',[('day','Closing day',None,today),('counted','Cash counted PKR'),('note','Count notes')],lambda v:self.s.close_day(v['day'],v['counted'],v['note']),'Count after all trading. Closing saves an immutable snapshot; later transactions do not alter it.'))
         tabs=Tabs();self.body.addWidget(tabs,1);tabs.addTab(Table(('Date','Description','PKR'),self.s.rows('SELECT date,description,amount FROM expenses ORDER BY id DESC')),'Expenses');tabs.addTab(Table(('Day','Movement','PKR','Reason','Staff'),self.s.rows('SELECT day,kind,amount_cents/100.0,note,actor FROM cash_movements ORDER BY created_at DESC')),'Cash movements');cols,rows=self.s.report('Cash closing','2000-01-01','2099-12-31');tabs.addTab(Table(cols,rows),'Closing history')
     def reports(self):
-        bar=self.bar();self.report_kind=combo(('Sales','Collections','Customer dues','Stock','Inventory valuation','Low stock','Purchases','Supplier balances','Supplier openings to confirm','Supplier statements','Supplier payments','Expenses','Cash closing','Profit'));self.report_start=QLineEdit(date.today().replace(day=1).isoformat());self.report_end=QLineEdit(date.today().isoformat());self.report_start.setMaximumWidth(140);self.report_end.setMaximumWidth(140)
+        bar=self.bar();self.report_kind=combo(('Sales','Collections','Customer dues','Stock','Inventory valuation','Low stock','Purchases','Supplier balances','Supplier openings to confirm','Supplier statements','Supplier payments','Expenses','Cash closing','Profit'));self.report_kind.setAccessibleName('Report type');self.report_start=QLineEdit(date.today().replace(day=1).isoformat());self.report_end=QLineEdit(date.today().isoformat());self.report_start.setMaximumWidth(140);self.report_end.setMaximumWidth(140)
         bar.addWidget(self.report_kind);bar.addWidget(label('From'));bar.addWidget(self.report_start);bar.addWidget(label('To'));bar.addWidget(self.report_end);self.button(bar,'Apply',self.run_report,True);self.report_table=Table(('Report',),[]);self.body.addWidget(self.report_table,1);bar=self.bar();self.button(bar,'Export CSV',lambda:self.export_table(self.report_table));self.button(bar,'Print / save PDF',self.print_report);self.body.addWidget(label('Stock, supplier and customer balances are current positions. Profit is an operational estimate; legacy costs may be unavailable.','muted'));self.run_report()
     def run_report(self):
         cols,rows=self.s.report(value(self.report_kind),self.report_start.text(),self.report_end.text());self.report_data=(cols,rows);self.report_table.columns=cols;self.report_table.setColumnCount(len(cols));self.report_table.setHorizontalHeaderLabels(cols);self.report_table.replace(rows);self.notice.setText(f'{len(rows)} report rows.')
@@ -420,7 +499,7 @@ class Window(QMainWindow):
             stock,payments=self.s.reconcile();QMessageBox.information(self,'Reconciliation',f'Stock discrepancies: {len(stock)}\nPayment discrepancies: {len(payments)}\nInvestigate discrepancies; records are never silently rewritten.')
         self.button(row,'Check stock & payments',check);self.body.addWidget(w);w,l=card('Restore safely');l.addWidget(label('Close Ainak Mahal, then open Ainak Mahal Recovery from Start. Recovery requires the current administrator login, verifies the backup and keeps a safety copy before replacement. Never restore over an open application.'));self.body.addWidget(w);self.body.addStretch()
     def global_search(self):
-        rows=self.s.global_search(self.search.text());d=QDialog(self);d.setWindowTitle('Search workspace');d.resize(960,600);l=vbox(d,24);l.addWidget(label(f'{len(rows)} results','section'));t=Table(('Type','ID','Name','Details'),rows);l.addWidget(t,1)
+        rows=self.s.global_search(self.search.text());d=QDialog(self);d.setWindowTitle('Search workspace');fit_to_screen(d,960,600);l=vbox(d,24);l.addWidget(label(f'{len(rows)} results','section'));t=Table(('Type','ID','Name','Details'),rows);l.addWidget(t,1)
         def open_result():
             r=t.selected();d.accept()
             if r[0]=='Customer':self.customer_profile(r[1])
@@ -429,7 +508,7 @@ class Window(QMainWindow):
     def print_doc(self,kind,identifier):
         path=self.s.print_document(kind,identifier,data_dir()/'documents');self.document(kind,path.read_text(encoding='utf-8'))
     def document(self,title,content):
-        d=QDialog(self);d.setWindowTitle(title);d.resize(900,760);l=vbox(d,24);view=QTextBrowser();view.setOpenExternalLinks(False);view.setHtml(content);l.addWidget(view,1);bar=QHBoxLayout();l.addLayout(bar)
+        d=QDialog(self);d.setWindowTitle(title);fit_to_screen(d,900,760);l=vbox(d,24);view=QTextBrowser();view.setOpenExternalLinks(False);view.setHtml(content);l.addWidget(view,1);bar=QHBoxLayout();l.addLayout(bar)
         def printer(pdf=False):
             p=QPrinter(QPrinter.HighResolution);settings=self.s.settings()
             if title in RECEIPT_KINDS and settings.get('receipt_format')=='80 mm':
@@ -449,14 +528,14 @@ class Window(QMainWindow):
 
 class Login(QWidget):
     def __init__(self,s,on_login):
-        super().__init__();self.s=s;self.on_login=on_login;self.setWindowTitle('Ainak Mahal · Sign in');self.resize(1040,700);self.setMinimumSize(850,640);self.setWindowIcon(QIcon(str(ASSETS/'ainak-mahal.ico')));outer=QHBoxLayout(self);outer.setContentsMargins(0,0,0,0);outer.setSpacing(0)
-        hero=QFrame();hero.setObjectName('sidebar');left=vbox(hero,44,20);logo=QSvgWidget(str(ASSETS/'logo-dark.svg'));logo.setFixedSize(350,90);left.addWidget(logo);left.addStretch();h=label('A clearer view\nof your shop.');h.setStyleSheet('font-size:30pt;color:white;font-weight:600');left.addWidget(h);left.addWidget(label('Customers, prescriptions and eyewear.\nEvery order, from counter to collection.'));left.addSpacing(24);left.addWidget(label('01   Connected optical orders\n\n02   Accurate stock and balances\n\n03   Your data, safely offline'));left.addStretch();footer=QWidget();footer_layout=vbox(footer,0,4);footer_layout.addWidget(label('MILLAT CHOWK · FAISALABAD'));credit=label(DEVELOPER_CREDIT);credit.setObjectName('developerCredit');credit.setStyleSheet('font-size:9pt;color:#C9D8E7');footer_layout.addWidget(credit);build=label(DISPLAY_VERSION);build.setStyleSheet('font-size:8pt;color:#AFC4DA');footer_layout.addWidget(build);left.addWidget(footer);outer.addWidget(hero,1)
+        super().__init__();self.s=s;self.on_login=on_login;self.setWindowTitle('Ainak Mahal · Sign in');self.setMinimumSize(720,480);fit_to_screen(self,1040,700);self.setWindowIcon(QIcon(str(ASSETS/'ainak-mahal.ico')));outer=QHBoxLayout(self);outer.setContentsMargins(0,0,0,0);outer.setSpacing(0)
+        hero=QFrame();hero.setObjectName('sidebar');left=vbox(hero,44,20);logo=QSvgWidget(str(ASSETS/'logo-dark.svg'));logo.setFixedSize(280,72);left.addWidget(logo);left.addStretch();h=label('A clearer view\nof your shop.');h.setStyleSheet('font-size:30pt;color:white;font-weight:600');left.addWidget(h);left.addWidget(label('Customers, prescriptions and eyewear.\nEvery order, from counter to collection.'));left.addSpacing(24);left.addWidget(label('01   Connected optical orders\n\n02   Accurate stock and balances\n\n03   Your data, safely offline'));left.addStretch();footer=QWidget();footer_layout=vbox(footer,0,4);footer_layout.addWidget(label('MILLAT CHOWK · FAISALABAD'));credit=label(DEVELOPER_CREDIT);credit.setObjectName('developerCredit');credit.setStyleSheet('font-size:9pt;color:#C9D8E7');footer_layout.addWidget(credit);build=label(DISPLAY_VERSION);build.setStyleSheet('font-size:8pt;color:#AFC4DA');footer_layout.addWidget(build);left.addWidget(footer);outer.addWidget(hero,1)
         right=QWidget();right.setObjectName('canvas');rl=vbox(right,48,16);rl.addStretch();first=s.first_run();rl.addWidget(label('YOUR LOCAL WORKSPACE','eyebrow'));rl.addWidget(label('Set up your shop' if first else 'Welcome back','heading'));rl.addWidget(label('Create your administrator account. No internet or subscription required.' if first else 'Sign in to continue. Your data stays on this computer.','muted'));self.fields={}
         for key,title in [('username','Username'),('password','Password')]+([('confirm','Confirm password')] if first else []):
             rl.addWidget(label(title));entry=QLineEdit();entry.setAccessibleName(title)
             if key!='username':entry.setEchoMode(QLineEdit.Password)
             self.fields[key]=entry;rl.addWidget(entry);entry.returnPressed.connect(self.submit)
-        show=QCheckBox('Show password');show.toggled.connect(lambda checked:[w.setEchoMode(QLineEdit.Normal if checked else QLineEdit.Password) for k,w in self.fields.items() if k!='username']);rl.addWidget(show);self.error=label('');self.error.setStyleSheet('color:#B91C1C');rl.addWidget(self.error);self.submit_button=action('Create administrator' if first else 'Sign in',self.submit,True);rl.addWidget(self.submit_button);rl.addWidget(label('Use at least 10 characters. Administrators manage staff, backups and stock adjustments.' if first else 'Need access? Ask your shop administrator. Recovery is available from the Windows Start menu.','muted'));rl.addStretch();outer.addWidget(right,1);self.fields['username'].setFocus()
+        show=QCheckBox('Show password');show.toggled.connect(lambda checked:[w.setEchoMode(QLineEdit.Normal if checked else QLineEdit.Password) for k,w in self.fields.items() if k!='username']);rl.addWidget(show);self.error=label('');self.error.setStyleSheet('color:#B91C1C');rl.addWidget(self.error);self.submit_button=action('Create administrator' if first else 'Sign in',self.submit,True);rl.addWidget(self.submit_button);rl.addWidget(label('Use at least 10 characters. Administrators manage staff, backups and stock adjustments.' if first else 'Need access? Ask your shop administrator. Recovery is available from the Windows Start menu.','muted'));rl.addStretch();login_area=scrolling(right);login_area.setObjectName('canvas');outer.addWidget(login_area,1);self.fields['username'].setFocus()
     def submit(self):
         if not self.submit_button.isEnabled():return
         self.submit_button.setEnabled(False)

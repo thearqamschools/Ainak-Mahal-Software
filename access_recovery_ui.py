@@ -16,8 +16,12 @@ class AccessRecovery(QDialog):
         self.result_summary = None
         self.setWindowTitle('Ainak Mahal · Access Recovery')
         self.setWindowIcon(QIcon(str(ASSETS / 'ainak-mahal.ico')))
-        self.resize(720, 680)
-        layout = QVBoxLayout(self)
+        from qdesktop import fit_to_screen, scrolling
+        outer = QVBoxLayout(self)
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        outer.addWidget(scrolling(content), 1)
+        fit_to_screen(self, 720, 680)
         title = QLabel('Recover administrator access')
         title.setObjectName('heading')
         title.setStyleSheet('font-size:18pt;font-weight:600')
@@ -88,7 +92,7 @@ class AccessRecovery(QDialog):
         buttons.addStretch()
         buttons.addWidget(close)
         buttons.addWidget(self.reset_button)
-        layout.addLayout(buttons)
+        outer.addLayout(buttons)
         footer = QLabel(f'{DEVELOPER_CREDIT} · {DISPLAY_VERSION}')
         footer.setStyleSheet('font-size:8pt;color:#5B6B7F')
         layout.addWidget(footer)

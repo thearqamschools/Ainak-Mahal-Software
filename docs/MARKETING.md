@@ -19,4 +19,4 @@ This text is for a future marketing page; the desktop runtime includes no SEO sc
 analytics, tracking or external assets.
 
 
-Developed by **Ahsan Iftikhar**. Current release: **2.0.4**.
+Developed by **Ahsan Iftikhar**. Current release: **2.0.5**.

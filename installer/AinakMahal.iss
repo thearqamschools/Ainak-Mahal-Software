@@ -1,9 +1,9 @@
 #define MyAppName "Ainak Mahal"
 #ifndef MyAppVersion
-#define MyAppVersion "2.0.4"
+#define MyAppVersion "2.0.5"
 #endif
 #ifndef MyFileVersion
-#define MyFileVersion "2.0.4.0"
+#define MyFileVersion "2.0.5.0"
 #endif
 #ifndef MyBuildId
 #define MyBuildId "manual"

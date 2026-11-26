@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt, QEvent, QSize
 from PySide6.QtGui import QImage, QPixmap, QColor
 from PySide6.QtPrintSupport import QPrinter, QPrintDialog
 from PySide6.QtWidgets import (QDialog, QLabel, QLineEdit, QComboBox, QPushButton, QSpinBox, QCheckBox,
-                               QHBoxLayout, QVBoxLayout, QMessageBox, QFileDialog, QGroupBox, QPlainTextEdit)
+                               QHBoxLayout, QVBoxLayout, QMessageBox, QFileDialog, QGroupBox, QPlainTextEdit, QWidget)
 import hardware as hw
 
 
@@ -46,7 +46,12 @@ class LabelDialog(QDialog):
         self.preview = QLabel()
         self.preview.setAlignment(Qt.AlignCenter)
         self.preview.setStyleSheet('background:white;border:1px solid #CBD5E1;padding:8px')
-        self.preview.setPixmap(QPixmap.fromImage(label_preview(settings, name, code, price_text)))
+        from qdesktop import available_area
+        area = available_area(parent)
+        width_mm, height_mm = hw.label_size(settings)
+        scale = max(3, min(8, int((area.height() - 260) / height_mm), int((area.width() - 120) / width_mm)))
+        self.preview.setPixmap(QPixmap.fromImage(label_preview(settings, name, code, price_text, scale)))
+        self.preview.setAccessibleName('Label preview')
         layout.addWidget(self.preview)
         row = QHBoxLayout()
         row.addWidget(QLabel('Copies'))
@@ -93,8 +98,12 @@ class HardwareCheck(QDialog):
         self.timer = hw.ScanTimer()
         self.last_scan = None
         self.setWindowTitle('Printer & scanner check')
-        self.resize(760, 720)
-        layout = QVBoxLayout(self)
+        from qdesktop import fit_to_screen, scrolling
+        outer = QVBoxLayout(self)
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        outer.addWidget(scrolling(content), 1)
+        fit_to_screen(self, 760, 720)
         intro = QLabel('Run this once on the shop computer after installing, and again after changing a printer or scanner. '
                        'Nothing is sold and no stock changes.')
         intro.setWordWrap(True)
@@ -155,6 +164,7 @@ class HardwareCheck(QDialog):
         b.addWidget(self.note)
         layout.addWidget(box)
         row = QHBoxLayout()
+        outer.addLayout(row)
         row.addStretch()
         save = QPushButton('Save check result')
         save.setObjectName('primary')
@@ -163,7 +173,6 @@ class HardwareCheck(QDialog):
         close.clicked.connect(self.reject)
         row.addWidget(close)
         row.addWidget(save)
-        layout.addLayout(row)
         # A scanner ends every code with Enter. No button may react to it, or a scan would start printing.
         for button in self.findChildren(QPushButton):
             button.setAutoDefault(False)

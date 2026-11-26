@@ -3,11 +3,11 @@ import sys
 from PySide6.QtWidgets import QApplication,QMessageBox
 from paths import data_dir,InstanceLock
 from erp import ERP
-from qdesktop import Window,Login,STYLE
+from qdesktop import Window,Login,STYLE,apply_theme
 from app_info import VERSION
 
 def main():
-    app=QApplication.instance() or QApplication(sys.argv);app.setStyle('Fusion');app.setStyleSheet(STYLE);app.setApplicationName('Ainak Mahal');app.setApplicationVersion(VERSION)
+    app=QApplication.instance() or QApplication(sys.argv);app.setStyle('Fusion');apply_theme(app);app.setApplicationName('Ainak Mahal');app.setApplicationVersion(VERSION)
     if '--smoke-test' in sys.argv:
         from qt_smoke import run
         return run(app)
@@ -21,7 +21,8 @@ def main():
     try:
         lock=InstanceLock(data_dir());service=ERP(data_dir()/'ainak_mahal.db')
         def signed_in():
-            window=Window(service);windows.append(window);window.show()
+            window=Window(service);windows.append(window)
+            window.showMaximized() if window.start_maximized else window.show()
         login=Login(service,signed_in);windows.append(login);login.show();return app.exec()
     except Exception as ex:QMessageBox.critical(None,'Ainak Mahal could not start',str(ex));return 1
     finally:

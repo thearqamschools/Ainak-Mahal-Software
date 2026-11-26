@@ -41,6 +41,11 @@ customer database was opened, overwritten or distributed during development.
   verified due at the statement date, oldest-paid-first allocation, refusals when records and
   statement disagree, pre-change verified backup, statement evidence table, audit and reports.
   Real statements must still be entered by the shop; no balance is inferred.
+- [x] 2.0.5: Screen fit at Windows scaling 100–150% (1366×768 to 1920×1080): smaller minimums,
+  fit-to-screen windows and dialogs, scrolling sidebar/sign-in/tall dialogs, wrapping button rows,
+  scaled label preview; accessible names on every input; visible keyboard focus in the sidebar,
+  checkboxes, tabs and tables; WCAG AA placeholder contrast. Automated audit on six screens.
+  A final look on the shop's own PC and Narrator remain manual.
 - [x] Additive schema 2 with pre-upgrade snapshot; legacy IDs, rows and storage path preserved.
 - [x] Offline runtime, no web view/server/cloud account, no subscription, no runtime telemetry.
 - [x] Updated operator/installation/design/reference/dependency documents and retained legacy UI.

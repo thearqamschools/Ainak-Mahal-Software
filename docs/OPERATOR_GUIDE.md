@@ -12,7 +12,7 @@ show Sign in. Show password changes visibility only; it does not save a password
 The new eyeglasses mark and navy/blue/teal interface identify version 2.0. The left sidebar
 opens every module. F2 opens checkout, F3 customers, Ctrl+K workspace search. Tables sort
 by column headers, select full rows and scroll horizontally when needed. Small windows
-scroll the page instead of hiding lower actions. The minimum window is 1080×720 logical px.
+scroll the page instead of hiding lower actions. The window fits screens from 1366×768 at up to 150% scaling.
 
 ## Upgrade without losing data
 
@@ -262,6 +262,15 @@ app. Anyone who can use this Windows account can use Access Recovery, so protect
 sign-in itself with a password. It changes sign-in accounts only, never business records. If it reports a damaged
 database, stop and keep the file and any `-wal`/`-shm` files for a technician.
 
+## Screen size, zoom and keyboard
+
+Ainak Mahal fits laptops from 1366×768 upwards with Windows display scaling at 100%, 125% or
+150%. On smaller or zoomed screens it opens maximised, the side menu and long pages scroll, and
+button rows wrap onto a second line instead of being cut off. Every function works without a
+mouse: Tab moves between items (the selected item has a blue or yellow outline), Space or Enter
+presses the selected button, F2 opens New Sale, F3 Customers and Ctrl+K the workspace search.
+Every box and list has a name that Windows Narrator reads aloud.
+
 ## Sample acceptance and troubleshooting
 
 Use a separate Windows test account or set AINAK_DATA_DIR to an empty test directory. Do
@@ -275,4 +284,4 @@ The installer is unsigned unless a trusted signing certificate is provided. The 
 build is for review; complete real-device and operator acceptance before daily trading.
 
 
-Developed by **Ahsan Iftikhar**. Current release: **2.0.4**.
+Developed by **Ahsan Iftikhar**. Current release: **2.0.5**.
