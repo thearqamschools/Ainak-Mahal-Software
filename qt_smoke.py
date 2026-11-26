@@ -69,7 +69,13 @@ def run(app):
             assert s.reconcile()==([],[]);window.close();window=None;s.close()
             restore_database(Path(temp)/'backup.db',path);s2=ERP(path);cleanup.callback(s2.close);s2.login('review-owner','sample-password');assert s2.scalar('PRAGMA user_version')==2
             progress('restore verified')
-            result={'passed':True,'pages':list(NAV),'workflows':['first-run UI','login','atomic optical order','Rx','barcode keyboard input','cart removal','repairs','delivery','purchasing','supplier payment','cash','reconciliation','PDF','backup','restore','schema 2']}
+            import access_recovery,access_recovery_ui
+            s2.close();recovery_window=access_recovery_ui.AccessRecovery(path);recovery_window.close()
+            reset=access_recovery.reset_access(path,'review-owner','replace','recovered-password','recovered-password','RESET review-owner',new_username='review-owner-2',backup_dir=Path(temp)/'access-backups',operator=('smoke','smoke'))
+            assert reset['backup'].is_file() and (reset['stock_mismatches'],reset['payment_mismatches'])==(0,0)
+            s3=ERP(path);cleanup.callback(s3.close);assert s3.login('review-owner-2','recovered-password')=='admin' and len(s3.access_notices)==1;s3.close()
+            progress('access recovery verified')
+            result={'passed':True,'pages':list(NAV),'workflows':['first-run UI','login','atomic optical order','Rx','barcode keyboard input','cart removal','repairs','delivery','purchasing','supplier payment','cash','reconciliation','PDF','backup','restore','access recovery','schema 2']}
     except Exception:result['error']=traceback.format_exc();result['stage']=stage
     finally:
         if window:window.cart=[];window.close()

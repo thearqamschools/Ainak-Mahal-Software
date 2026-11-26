@@ -447,4 +447,6 @@ class Login(QWidget):
         except Exception as ex:self.error.setText(error_text(ex));QTimer.singleShot(700,lambda:self.submit_button.setEnabled(True));return
         for key in ('password','confirm'):
             if key in self.fields:self.fields[key].clear()
+        for _id,created,win_user,computer,mode,target,new_name,backup in getattr(self.s,'access_notices',[]):
+            QMessageBox.warning(self,'Administrator access was reset',f'On {created}, Windows user "{win_user}" on {computer} used Ainak Mahal Access Recovery.\n\n'+(f'New password set for "{target}".' if mode=='password' else f'New administrator "{new_name}" created; "{target}" was switched off.')+f'\n\nSafety backup made before the change:\n{backup}\n\nIf you did not expect this, check Settings & Staff and the audit log.')
         self.on_login();self.close()

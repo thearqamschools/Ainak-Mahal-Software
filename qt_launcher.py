@@ -11,6 +11,9 @@ def main():
     if '--smoke-test' in sys.argv:
         from qt_smoke import run
         return run(app)
+    if '--reset-access' in sys.argv:
+        from access_recovery_ui import main as reset_access
+        return reset_access()
     if '--restore' in sys.argv:
         from recovery import main as recover
         return recover()

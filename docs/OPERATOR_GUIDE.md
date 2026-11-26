@@ -182,6 +182,34 @@ another running instance. After restore, sign in and check stock/payment reconci
 If a corrupt database prevents login, preserve it and seek isolated technician-led recovery;
 the app does not bypass authentication or delete it automatically.
 
+## Forgot the administrator username or password
+
+Do **not** delete or reinstall to fix a lost sign-in. Your customers, stock and sales are
+still safe in `ainak_mahal.db`. Use **Ainak Mahal Access Recovery** from the Start menu:
+
+1. Close every Ainak Mahal window. Recovery refuses to run while the app is open.
+2. Open Start → Ainak Mahal Access Recovery. The top table lists every username on this
+   computer, with its role and status. This is how you find a forgotten username.
+   Passwords are never shown; they are stored only in scrambled (hashed) form.
+3. Choose the administrator account, then choose one option:
+   - **Set a new password and keep the same username**, or
+   - **Create a replacement administrator**: enter a new username. The lost account is
+     switched off so the old password stops working. Its history stays.
+4. Type the new password twice (at least 10 characters, not the same as the username).
+5. Type the confirmation exactly as shown, for example `RESET owner`, then press
+   Make backup and recover access and answer Yes.
+6. The tool first saves and checks a safety backup in the `access-recovery-backups`
+   folder next to your data, and shows its full location. Copy it to a USB drive.
+   If the backup fails, nothing is changed.
+7. Open Ainak Mahal and sign in with the new details. The first administrator who signs in
+   sees a warning that access was reset, with the date, Windows user and backup location.
+   The audit log also records it. If nobody in the shop did this, check Settings & Staff.
+
+Staff (cashier) passwords are not reset here: an administrator changes those inside the
+app. Anyone who can use this Windows account can use Access Recovery, so protect the Windows
+sign-in itself with a password. It changes sign-in accounts only, never business records. If it reports a damaged
+database, stop and keep the file and any `-wal`/`-shm` files for a technician.
+
 ## Sample acceptance and troubleshooting
 
 Use a separate Windows test account or set AINAK_DATA_DIR to an empty test directory. Do
@@ -195,4 +223,4 @@ The installer is unsigned unless a trusted signing certificate is provided. The 
 build is for review; complete real-device and operator acceptance before daily trading.
 
 
-Developed by **Ahsan Iftikhar**. Current release: **2.0.1**.
+Developed by **Ahsan Iftikhar**. Current release: **2.0.2**.

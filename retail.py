@@ -9,6 +9,7 @@ from pathlib import Path
 from core import Store, money, now, quantity
 from migrations import migrate
 import phase3, phase4, phase5, phase6
+import access_recovery
 from deployment_tools import reconcile_stock, reconcile_payments
 
 def required(value, label):
@@ -42,6 +43,7 @@ class Retail:
             self.store.close()
             raise
         self.actor, self.role = actor, role
+        self.access_notices = []
 
     def close(self): self.store.close()
     def rows(self, sql, args=()): return self.db.execute(sql,args).fetchall()
@@ -56,7 +58,10 @@ class Retail:
         role = phase3.authenticate(self.db,username.strip(),password)
         if not role: raise ValueError('Username or password is incorrect')
         self.actor, self.role = username.strip(), role
-        with self.db: self.audit('sign_in')
+        with self.db:
+            self.audit('sign_in')
+            # A reset made by the Access Recovery tool is shown to, and audited for, the next administrator.
+            self.access_notices = access_recovery.acknowledge(self.db,self.actor) if role == 'admin' else []
         return role
     def bootstrap(self, username, password, confirm):
         if password != confirm: raise ValueError('Passwords do not match')
