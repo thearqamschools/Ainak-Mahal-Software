@@ -144,6 +144,14 @@ class ERP(Retail):
             if not row or row[1]:raise ValueError('Only unverified legacy receipts can have their opening balance confirmed')
             if cents>money(row[0]):raise ValueError('Opening balance exceeds the original purchase total')
             self.db.execute('UPDATE purchase_openings SET paid_cents=?,verified=1 WHERE purchase_id=?',(money(row[0])-cents,purchase_id));self.audit('supplier_opening_confirmed',purchase_id)
+    def supplier_statement_preview(self,supplier_id,statement_date,balance):
+        self.authorize(True);import supplier_openings;return supplier_openings.preview(self.db,supplier_id,statement_date,balance)
+    def confirm_supplier_statement(self,supplier_id,statement_date,balance,reference,note=''):
+        import supplier_openings;return supplier_openings.confirm(self,supplier_id,statement_date,balance,reference,note)
+    def supplier_opening_worksheet(self):
+        self.authorize();import supplier_openings;return supplier_openings.worksheet(self.db)
+    def supplier_statements(self):
+        self.authorize();import supplier_openings;return supplier_openings.statements(self.db)
     def supplier_payment(self,purchase_id,amount,method,reference):
         self.authorize(True);cents=money(amount);reference=required(reference,'Unique payment reference')
         if method not in ('Cash','Bank','Card'):raise ValueError('Choose a payment method')
@@ -161,7 +169,7 @@ class ERP(Retail):
         for sid,name,phone in self.suppliers():
             receipts=[r for r in self.purchases() if self.scalar('SELECT supplier_id FROM purchases WHERE id=?',(r[0],))==sid]
             gross=sum(r[3] for r in receipts);paid=sum(r[4] for r in receipts);due=sum(r[5] for r in receipts if r[5] is not None)
-            result.append((sid,name,phone,gross,paid,round(due,2),sum(r[6]!='Verified' for r in receipts)))
+            result.append((sid,name,phone,gross,paid,round(due,2),sum(r[6]!='Verified' for r in receipts),round(sum(r[3] for r in receipts if r[6]!='Verified'),2)))
         return result
     def expected_cash(self,selected_day):
         value=super().expected_cash(selected_day)
@@ -184,7 +192,9 @@ class ERP(Retail):
         if kind=='Low stock':return ('ID','SKU','Item','Available','Reorder'),self.rows('''SELECT p.id,p.sku,p.name,p.qty,COALESCE(d.reorder_level,2) FROM products p LEFT JOIN product_details d ON d.product_id=p.id
           WHERE p.qty<=COALESCE(d.reorder_level,2) AND COALESCE(d.is_service,0)=0 ORDER BY p.qty''')
         if kind=='Purchases':return ('Receipt','Supplier','Date','Total PKR','Paid PKR','Due PKR','Opening status'),[r for r in self.purchases() if start<=r[2][:10]<=end]
-        if kind=='Supplier balances':return ('ID','Supplier','Phone','Purchased PKR','Paid PKR','Confirmed due PKR','Unverified receipts'),self.supplier_balances()
+        if kind=='Supplier balances':return ('ID','Supplier','Phone','Purchased PKR','Paid PKR','Confirmed due PKR','Unverified receipts','Unverified receipts PKR'),self.supplier_balances()
+        if kind=='Supplier openings to confirm':return ('ID','Supplier','Phone','Unverified receipts','Unverified total PKR','Oldest receipt','Newest receipt'),self.supplier_opening_worksheet()
+        if kind=='Supplier statements':return ('Statement date','Supplier','Reference','Statement PKR','Already confirmed due PKR','Legacy unpaid PKR','Confirmed by','Saved at'),self.supplier_statements()
         if kind=='Supplier payments':return ('ID','Receipt','PKR','Method','Reference','Staff','Date'),self.rows('SELECT id,purchase_id,amount_cents/100.0,method,reference,actor,created_at FROM supplier_payments WHERE substr(created_at,1,10) BETWEEN ? AND ? ORDER BY created_at DESC',(start,end))
         return super().report(kind,start,end)
     def print_document(self,kind,identifier,directory):

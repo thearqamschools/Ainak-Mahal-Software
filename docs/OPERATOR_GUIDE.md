@@ -159,12 +159,34 @@ verified unpaid balance. Record supplier payment only after paying, with positiv
 method and unique reference. The service blocks overpayment and duplicate references.
 Cash supplier payments reduce the expected cash drawer; bank/card payments do not.
 
-Legacy receipts have **Opening unverified**, rather than invented debts. Reconcile with
-supplier statements and choose Confirm legacy opening; enter the verified unpaid amount.
-The remainder becomes a historical opening paid adjustment, not a new cash outflow. Opening
-confirmation is audited and allowed once. Supplier profiles show confirmed due and a count
-of unverified receipts; do not treat confirmed due as total liability until all openings are
-reconciled. Supplier history and reports show purchase receipts and payment history.
+### Old supplier balances (Opening unverified)
+
+Receipts entered before version 2.0 show **Opening unverified**. Ainak Mahal does not know
+how much of them was already paid, so it never guesses a debt. Confirm them from the supplier's
+own statement:
+
+1. Reports → **Supplier openings to confirm** lists each supplier with old receipts, their
+   total and dates. Export it to CSV or print it, and ask each supplier for a written statement
+   (or ledger page) dated on or after the newest receipt shown.
+2. Purchases & Suppliers → **Reconcile supplier statement**. Choose the supplier, type the
+   statement date, the **total balance the statement says the shop owes**, and the statement
+   number or reference.
+3. Ainak Mahal shows the calculation before saving: the statement balance, minus what it already
+   knows is unpaid on newer, confirmed receipts up to that date, equals what is still unpaid on
+   the old receipts. Older receipts are treated as paid first, as suppliers normally do.
+   Check it and press Yes.
+4. A verified backup is saved in the `backups` folder first. The statement, its reference and
+   the person who confirmed it are kept, and shown in Reports → **Supplier statements**.
+
+The paid part of old receipts is a historical adjustment. It is **not** a new cash or bank
+payment and does not change today's cash drawer. If the statement asks for more than all old
+receipts together, or less than newer receipts already show as unpaid, Ainak Mahal refuses and
+saves nothing: check for missing invoices or unrecorded payments with the supplier first.
+Each supplier is confirmed once. If a statement lists every invoice separately, you can instead
+select one receipt and use **Confirm one legacy receipt** with that invoice's unpaid amount.
+
+Supplier profiles show confirmed due, the number of unverified receipts and their value. Do not
+treat confirmed due as the full amount owed until every supplier is reconciled.
 
 ## Customer payments, returns and store credit
 
@@ -253,4 +275,4 @@ The installer is unsigned unless a trusted signing certificate is provided. The 
 build is for review; complete real-device and operator acceptance before daily trading.
 
 
-Developed by **Ahsan Iftikhar**. Current release: **2.0.3**.
+Developed by **Ahsan Iftikhar**. Current release: **2.0.4**.
